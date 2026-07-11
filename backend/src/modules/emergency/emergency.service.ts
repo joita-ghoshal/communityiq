@@ -137,4 +137,56 @@ export class EmergencyService {
       count: alertsWithDistance.length,
     };
   }
+
+  async checkProximityAlerts(latitude: number, longitude: number, radiusKm: number = 0.5) {
+    const activeAlerts = await this.alertRepo.find({
+      where: { isActive: true },
+      order: { severity: 'DESC', createdAt: 'DESC' },
+    });
+
+    const nearbyAlerts = activeAlerts
+      .map((alert) => {
+        let alertLat: number | null = null;
+        let alertLng: number | null = null;
+
+        if (alert.location) {
+          const loc = alert.location as any;
+          if (typeof loc === 'object' && loc.coordinates) {
+            alertLng = loc.coordinates[0];
+            alertLat = loc.coordinates[1];
+          } else if (typeof loc === 'string') {
+            const match = loc.match(/(-?\d+\.?\d*)\s+(-?\d+\.?\d*)/);
+            if (match) {
+              alertLng = parseFloat(match[1]);
+              alertLat = parseFloat(match[2]);
+            }
+          }
+        }
+
+        if (alertLat === null || alertLng === null) {
+          if (alert.affectedArea?.coordinates?.[0]?.[0]) {
+            const coords = alert.affectedArea.coordinates[0][0];
+            alertLng = coords[0];
+            alertLat = coords[1];
+          }
+        }
+
+        if (alertLat === null || alertLng === null) {
+          return null;
+        }
+
+        const distance = this.haversine(latitude, longitude, alertLat, alertLng);
+        return { ...alert, distance: Math.round(distance * 1000) / 1000 };
+      })
+      .filter((alert): alert is NonNullable<typeof alert> => alert !== null && alert.distance <= radiusKm)
+      .sort((a, b) => a.distance - b.distance);
+
+    return {
+      latitude,
+      longitude,
+      radiusKm,
+      alerts: nearbyAlerts,
+      count: nearbyAlerts.length,
+    };
+  }
 }

@@ -42,7 +42,7 @@ export default function HeroesPage() {
 
   return (
     <AppShell>
-      <div className={`${theme.bg} ${theme.darkBg} min-h-full`}>
+      <div className={`${theme.background} min-h-full`}>
         <div className="max-w-6xl mx-auto p-4 md:p-6 lg:p-8 space-y-6">
           {/* Header */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>

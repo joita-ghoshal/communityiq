@@ -9,10 +9,15 @@ import AppShell from '@/components/layout/AppShell';
 import { pageThemes } from '@/lib/theme/page-themes';
 import { getCategoryIcon, getStatusColor } from '@/lib/utils';
 
-const mapFilters = {
-  categories: ['All', 'Road Damage', 'Water Leakage', 'Garbage', 'Electricity', 'Drainage', 'Safety'],
-  statuses: ['All', 'Reported', 'Verified', 'In Progress', 'Resolved'],
-  priorities: ['All', 'Low', 'Medium', 'High', 'Critical'],
+const filterCategories = ['All', 'Road Damage', 'Water Leakage', 'Garbage', 'Electricity', 'Drainage', 'Safety'];
+
+const catToInternal: Record<string, string> = {
+  'Road Damage': 'road_damage',
+  'Water Leakage': 'water_leakage',
+  'Garbage': 'garbage',
+  'Electricity': 'electricity',
+  'Drainage': 'drainage',
+  'Safety': 'public_safety',
 };
 
 const mockMapIssues = [
@@ -23,8 +28,28 @@ const mockMapIssues = [
   { id: '5', title: 'Fallen tree', category: 'environmental', status: 'community_verifying', priority: 'medium', lat: 28.6110, lng: 77.212, distance: '0.6 km' },
 ];
 
-function createPinIcon(L: typeof import('leaflet'), priority: string) {
-  const color = priority === 'critical' ? '#ef4444' : priority === 'high' ? '#f97316' : '#10b981';
+const categoryMarkerColors: Record<string, { color: string; svg: string }> = {
+  road_damage: { color: '#f97316', svg: '🛤️' },
+  water_leakage: { color: '#3b82f6', svg: '💧' },
+  garbage: { color: '#22c55e', svg: '🗑️' },
+  electricity: { color: '#eab308', svg: '⚡' },
+  drainage: { color: '#06b6d4', svg: '🌊' },
+  public_safety: { color: '#ef4444', svg: '🛡️' },
+  street_lighting: { color: '#a855f7', svg: '💡' },
+  environmental: { color: '#84cc16', svg: '🌿' },
+};
+
+const priorityColors: Record<string, string> = {
+  critical: '#ef4444',
+  high: '#f97316',
+  medium: '#eab308',
+  low: '#22c55e',
+};
+
+function createPinIcon(L: typeof import('leaflet'), category: string, priority: string) {
+  const base = categoryMarkerColors[category];
+  const fallbackColor = priorityColors[priority] || '#10b981';
+  const color = base?.color || fallbackColor;
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="40" viewBox="0 0 28 40">
     <path d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.268 21.732 0 14 0z" fill="${color}"/>
     <circle cx="14" cy="13" r="6" fill="white" opacity="0.9"/>
@@ -48,6 +73,7 @@ interface LeafletMapProps {
 
 const DynamicLeafletMap = dynamic<LeafletMapProps>(
   async () => {
+    await import('leaflet/dist/leaflet.css');
     const { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } = await import('react-leaflet');
     const L = (await import('leaflet')).default;
 
@@ -96,9 +122,8 @@ const DynamicLeafletMap = dynamic<LeafletMapProps>(
         <MapContainer
           center={center}
           zoom={13}
-          className="h-full w-full rounded-2xl"
-          style={{ minHeight: '100%' }}
           scrollWheelZoom={true}
+          style={{ width: '100%', height: '100%', borderRadius: '12px' }}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
@@ -111,7 +136,7 @@ const DynamicLeafletMap = dynamic<LeafletMapProps>(
             <Marker
               key={issue.id}
               position={[issue.lat, issue.lng]}
-              icon={createPinIcon(L, issue.priority)}
+              icon={createPinIcon(L, issue.category, issue.priority)}
               eventHandlers={{ click: () => onIssueClick(issue.id) }}
             >
               <Popup>
@@ -163,17 +188,7 @@ export default function MapPage() {
 
   const filteredIssues = activeCategory === 'All'
     ? mockMapIssues
-    : mockMapIssues.filter((issue) => {
-        const catMap: Record<string, string> = {
-          'Road Damage': 'road_damage',
-          'Water Leakage': 'water_leakage',
-          'Garbage': 'garbage',
-          'Electricity': 'street_lighting',
-          'Drainage': 'water_leakage',
-          'Safety': 'environmental',
-        };
-        return issue.category === catMap[activeCategory];
-      });
+    : mockMapIssues.filter((issue) => issue.category === catToInternal[activeCategory]);
 
   const handlePinClick = (id: string) => {
     setSelectedIssue(id || null);
@@ -181,7 +196,7 @@ export default function MapPage() {
 
   return (
     <AppShell>
-      <div className={`${theme.bg} ${theme.darkBg} min-h-full`}>
+      <div className={`${theme.background} min-h-full`}>
         <div className="flex flex-col min-h-[calc(100vh-4rem)]">
           {/* Map Header */}
           <div className="p-4 md:p-6 pb-3">
@@ -209,7 +224,7 @@ export default function MapPage() {
           {/* Filters */}
           <div className="px-4 md:px-6 pb-3">
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-              {mapFilters.categories.map((cat) => (
+              {filterCategories.map((cat) => (
                 <button key={cat} onClick={() => setActiveCategory(cat)}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${activeCategory === cat ? 'bg-emerald-600 text-white shadow-md' : 'bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
                   {cat}
@@ -221,7 +236,7 @@ export default function MapPage() {
           {/* Map / List Content */}
           <div className="flex-1 px-4 md:px-6 pb-4 min-h-0">
             {viewMode === 'map' ? (
-              <div className="h-full rounded-2xl overflow-hidden relative bg-slate-200 dark:bg-slate-800" style={{ minHeight: 'calc(100vh - 16rem)' }}>
+              <div className="h-full rounded-2xl overflow-hidden relative bg-slate-200 dark:bg-slate-800" style={{ minHeight: 'calc(100vh - 16rem)', width: '100%' }}>
                 <Suspense fallback={
                   <div className="h-full w-full flex items-center justify-center">
                     <div className="text-slate-500 text-sm">Loading map...</div>
@@ -232,10 +247,13 @@ export default function MapPage() {
 
                 {/* Legend */}
                 <div className="absolute bottom-4 left-4 z-[1000] bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-xl p-3 text-xs space-y-1.5 shadow-lg">
-                  <p className="font-semibold text-slate-900 dark:text-white mb-1">Priority</p>
-                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-500" /> Critical</div>
-                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-orange-500" /> High</div>
-                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-emerald-500" /> Medium/Low</div>
+                  <p className="font-semibold text-slate-900 dark:text-white mb-1">Categories</p>
+                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-orange-500" /> Road Damage</div>
+                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-blue-500" /> Water Leakage</div>
+                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-green-500" /> Garbage</div>
+                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-yellow-500" /> Electricity</div>
+                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-cyan-500" /> Drainage</div>
+                  <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-red-500" /> Public Safety</div>
                 </div>
 
                 {/* Issue detail card */}

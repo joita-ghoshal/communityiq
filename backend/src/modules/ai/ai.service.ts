@@ -581,4 +581,124 @@ Provide 3-5 insights covering trends, patterns, and recommendations.`;
   private generateFallbackSummary(stats: any, days: number): string {
     return `Over the last ${days} days, ${stats.total} issues were reported. ${stats.resolved} have been resolved (${stats.total > 0 ? Math.round((stats.resolved / stats.total) * 100) : 0}% resolution rate). ${stats.critical} critical issues remain. Top categories: ${Object.entries(stats.categories).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k}(${v})`).join(', ')}.`;
   }
+
+  async chat(message: string, conversationHistory: Array<{ role: string; content: string }> = []): Promise<{ response: string; suggestions?: string[] }> {
+    const systemPrompt = `You are CommunityIQ Assistant, an AI helper for the CommunityIQ civic issue reporting platform. You help citizens and officials with:
+
+- Reporting civic issues: road damage, water supply, sanitation, electricity, garbage, drainage, street lighting, public safety, noise/air pollution, parks, traffic, building safety, flooding, animal control
+- Understanding the issue map and how to use it
+- Emergency alerts and safety information
+- Issue severity levels: low, medium, high, critical, emergency
+- Issue statuses: open, in_progress, under_review, resolved, closed
+- User roles: citizen, volunteer, department_admin, municipal_admin, super_admin
+- Volunteer management and department assignments
+- General civic governance questions
+
+Be helpful, concise, and guide users toward taking action. When appropriate, suggest relevant actions they can take.`;
+
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...conversationHistory.map((m) => ({ role: m.role, content: m.content })),
+      { role: 'user', content: message },
+    ];
+
+    if (this.openaiApiKey) {
+      try {
+        const response = await firstValueFrom(
+          this.httpService.post(
+            'https://api.openai.com/v1/chat/completions',
+            {
+              model: this.openaiModel || 'gpt-4',
+              messages,
+              temperature: 0.7,
+              max_tokens: 800,
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${this.openaiApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              timeout: 30000,
+            },
+          ),
+        );
+
+        const content = response.data.choices[0].message.content;
+        const suggestions = this.extractSuggestions(message);
+        return { response: content, suggestions };
+      } catch (e: any) {
+        this.logger.error('OpenAI chat error', e.message);
+      }
+    }
+
+    return this.mockChatResponse(message);
+  }
+
+  private extractSuggestions(message: string): string[] {
+    const lower = message.toLowerCase();
+    if (lower.includes('report') || lower.includes('issue')) {
+      return ['Report a new issue', 'View issues on the map', 'Check issue status'];
+    }
+    if (lower.includes('emergency') || lower.includes('alert')) {
+      return ['View active alerts', 'Report emergency', 'Find nearby alerts'];
+    }
+    if (lower.includes('status') || lower.includes('track')) {
+      return ['View my reported issues', 'Check issue progress', 'View resolved issues'];
+    }
+    if (lower.includes('volunteer') || lower.includes('help')) {
+      return ['Join as volunteer', 'View volunteer opportunities', 'Check department assignments'];
+    }
+    return ['Report an issue', 'View the map', 'Check emergency alerts'];
+  }
+
+  private mockChatResponse(message: string): { response: string; suggestions?: string[] } {
+    const lower = message.toLowerCase();
+
+    if (lower.includes('report') && (lower.includes('issue') || lower.includes('pothole') || lower.includes('road'))) {
+      return {
+        response: 'To report a civic issue, go to the Report Issue page and provide:\n1. A title and detailed description\n2. The category (e.g., road_damage, water_supply)\n3. A photo if possible\n4. Your location will be auto-detected or you can pin it on the map\n\nThe AI will analyze your report and suggest a severity level.',
+        suggestions: ['Report now', 'View categories', 'See example reports'],
+      };
+    }
+
+    if (lower.includes('map') || lower.includes('view issues')) {
+      return {
+        response: 'The CommunityIQ map shows all reported issues in your area. You can filter by category, status, and severity. Green markers are resolved, yellow are in progress, and red are open/high priority.',
+        suggestions: ['Open the map', 'Filter by category', 'Toggle cluster view'],
+      };
+    }
+
+    if (lower.includes('emergency') || lower.includes('alert')) {
+      return {
+        response: 'Emergency alerts are displayed prominently on the platform. Active alerts show severity levels from Low to Extreme. You\'ll receive push notifications for alerts in your area. If you see an immediate danger, call your local emergency number first.',
+        suggestions: ['View active alerts', 'Report an emergency', 'Set alert preferences'],
+      };
+    }
+
+    if (lower.includes('volunteer')) {
+      return {
+        response: 'Volunteers help resolve civic issues in their communities. As a volunteer, you can claim issues, update progress, and collaborate with department admins. Sign up through the Volunteer section to get started.',
+        suggestions: ['Sign up as volunteer', 'View available issues', 'Check my assignments'],
+      };
+    }
+
+    if (lower.includes('hello') || lower.includes('hi') || lower.includes('hey')) {
+      return {
+        response: 'Hello! I\'m the CommunityIQ assistant. I can help you report civic issues, check emergency alerts, navigate the map, or understand how the platform works. What would you like to do?',
+        suggestions: ['Report an issue', 'View the map', 'Check alerts', 'How to volunteer'],
+      };
+    }
+
+    if (lower.includes('thank')) {
+      return {
+        response: 'You\'re welcome! Feel free to ask if you need any more help with CommunityIQ. Together, we can make our communities better!',
+        suggestions: ['Report an issue', 'View my dashboard'],
+      };
+    }
+
+    return {
+      response: 'I can help you with CommunityIQ! Here are some things I can assist with:\n- Reporting civic issues (potholes, water leaks, garbage, etc.)\n- Understanding the issue map\n- Emergency alerts and safety\n- Volunteer opportunities\n- Platform navigation\n\nWhat would you like to know?',
+      suggestions: ['Report an issue', 'View the map', 'Check alerts', 'About CommunityIQ'],
+    };
+  }
 }

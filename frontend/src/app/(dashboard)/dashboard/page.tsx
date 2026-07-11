@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import {
   ExclamationTriangleIcon, CheckCircleIcon, ClockIcon, FireIcon,
   MagnifyingGlassIcon, PhotoIcon, ChartBarIcon, ArrowRightIcon,
+  ServerIcon, UserGroupIcon,
 } from '@heroicons/react/24/outline';
 import AppShell from '@/components/layout/AppShell';
 import StatsCard from '@/components/dashboard/StatsCard';
@@ -28,13 +29,13 @@ const quickActions = [
 export default function DashboardPage() {
   return (
     <AppShell>
-      <div className="min-h-full bg-slate-50 dark:bg-slate-950">
+      <div className="min-h-full">
         <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
           {/* Hero Banner */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-6 md:p-8 text-white mb-8 shadow-xl"
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-500 via-blue-500 to-cyan-500 dark:from-sky-600 dark:via-blue-600 dark:to-cyan-600 p-6 md:p-8 text-white mb-8 shadow-xl shadow-blue-500/20"
           >
             <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
             <div className="relative z-10">
@@ -103,6 +104,57 @@ export default function DashboardPage() {
             <div className="space-y-6">
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
                 <AIInsights />
+              </motion.div>
+
+              {/* Platform Health */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.55 }} className="glass-card p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <ServerIcon className="w-5 h-5 text-emerald-500" />
+                  <h3 className="text-sm font-bold font-heading text-slate-900 dark:text-white">Platform Health</h3>
+                </div>
+                <div className="space-y-3">
+                  {[
+                    { label: 'API Server', status: 'Operational', color: 'bg-emerald-500' },
+                    { label: 'Database', status: 'Operational', color: 'bg-emerald-500' },
+                    { label: 'AI Engine', status: 'Operational', color: 'bg-emerald-500' },
+                    { label: 'Uptime', status: '99.98%', color: 'bg-blue-500' },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center justify-between">
+                      <span className="text-xs text-slate-600 dark:text-slate-400">{item.label}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium text-slate-900 dark:text-white">{item.status}</span>
+                        <div className={`w-2 h-2 rounded-full ${item.color}`} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+
+              {/* Top Contributors */}
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }} className="glass-card p-5">
+                <div className="flex items-center gap-2 mb-4">
+                  <UserGroupIcon className="w-5 h-5 text-amber-500" />
+                  <h3 className="text-sm font-bold font-heading text-slate-900 dark:text-white">Top Contributors</h3>
+                </div>
+                <div className="space-y-3">
+                  {[
+                    { name: 'Priya Sharma', points: 2480, initials: 'PS' },
+                    { name: 'Rahul Verma', points: 2120, initials: 'RV' },
+                    { name: 'Anita Patel', points: 1890, initials: 'AP' },
+                    { name: 'Vikram Singh', points: 1640, initials: 'VS' },
+                  ].map((contributor, i) => (
+                    <div key={contributor.name} className="flex items-center gap-3">
+                      <span className="text-xs font-bold text-slate-400 w-4">{i + 1}</span>
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white text-[10px] font-bold">
+                        {contributor.initials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-slate-900 dark:text-white truncate">{contributor.name}</p>
+                      </div>
+                      <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">{contributor.points.toLocaleString()} pts</span>
+                    </div>
+                  ))}
+                </div>
               </motion.div>
             </div>
           </div>

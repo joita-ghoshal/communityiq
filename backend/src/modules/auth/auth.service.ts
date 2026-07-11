@@ -11,12 +11,15 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
+import { createHash } from 'crypto';
 import { User, UserRole } from '../../database/entities/user.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 
 @Injectable()
 export class AuthService {
+  private readonly otpStore = new Map<string, { hash: string; expiresAt: number }>();
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -335,5 +338,55 @@ export class AuthService {
       return result;
     }
     return null;
+  }
+
+  async sendOtp(email: string) {
+    const user = await this.userRepository.findOne({ where: { email } });
+    if (!user) {
+      throw new NotFoundException('No account found with this email');
+    }
+
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    const hash = createHash('sha256').update(otp).digest('hex');
+    const expiresAt = Date.now() + 10 * 60 * 1000;
+
+    this.otpStore.set(email, { hash, expiresAt });
+
+    return { message: 'OTP sent to email', otp };
+  }
+
+  async verifyOtpAndResetPassword(email: string, otp: string, newPassword: string) {
+    const stored = this.otpStore.get(email);
+    if (!stored) {
+      throw new BadRequestException('No OTP requested for this email');
+    }
+
+    if (Date.now() > stored.expiresAt) {
+      this.otpStore.delete(email);
+      throw new BadRequestException('OTP has expired');
+    }
+
+    const hash = createHash('sha256').update(otp).digest('hex');
+    if (hash !== stored.hash) {
+      throw new BadRequestException('Invalid OTP');
+    }
+
+    const user = await this.userRepository.findOne({ where: { email } });
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const salt = await bcrypt.genSalt(12);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    await this.userRepository.update(user.id, {
+      password: hashedPassword,
+      resetPasswordToken: null,
+      resetPasswordExpires: null,
+    });
+
+    this.otpStore.delete(email);
+
+    return { message: 'Password reset successfully' };
   }
 }

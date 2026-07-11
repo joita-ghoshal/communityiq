@@ -11,6 +11,7 @@ import { Volunteer } from './entities/volunteer.entity';
 import { EmergencyAlert } from './entities/emergency-alert.entity';
 import { IssueTimeline } from './entities/issue-timeline.entity';
 import { Comment } from './entities/comment.entity';
+import { LeaveRequest } from './entities/leave-request.entity';
 
 const entities = [
   User,
@@ -23,6 +24,7 @@ const entities = [
   EmergencyAlert,
   IssueTimeline,
   Comment,
+  LeaveRequest,
 ];
 
 @Global()

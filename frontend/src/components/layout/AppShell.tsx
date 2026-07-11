@@ -1,29 +1,23 @@
-'use client';
-import { ReactNode } from 'react';
-import Sidebar from './Sidebar';
-import Header from './Header';
-import MobileNav from './MobileNav';
-import { useUIStore } from '@/stores/ui.store';
-import { useEmergencyStore } from '@/stores/emergency.store';
-import EmergencyAlertBanner from '@/components/emergency/EmergencyAlertBanner';
+"use client";
 
-interface AppShellProps { children: ReactNode; }
+import React, { useState } from "react";
+import Sidebar from "./Sidebar";
+import Header from "./Header";
 
-export default function AppShell({ children }: AppShellProps) {
-  const { sidebarCollapsed } = useUIStore();
-  const { emergencyActive } = useEmergencyStore();
+export default function AppShell({ children }: { children: React.ReactNode }) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="min-h-screen">
       <Sidebar />
-      <div className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-[280px]'}`}>
-        <Header />
-        {emergencyActive && <EmergencyAlertBanner />}
-        <main className="min-h-[calc(100vh-4rem)] pb-20 lg:pb-0">
+      <div className="lg:pl-[260px] min-h-screen flex flex-col transition-all duration-300">
+        <Header
+          onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)}
+        />
+        <main className="flex-1 relative overflow-y-auto">
           {children}
         </main>
       </div>
-      <MobileNav />
     </div>
   );
 }

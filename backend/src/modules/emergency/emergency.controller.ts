@@ -83,4 +83,17 @@ export class EmergencyController {
   async findOne(@Param('id') id: string) {
     return this.emergencyService.findOne(id);
   }
+
+  @Get('proximity-check')
+  @ApiOperation({ summary: 'Check for proximity alerts using geofencing (default 500m radius)' })
+  @ApiQuery({ name: 'latitude', type: Number })
+  @ApiQuery({ name: 'longitude', type: Number })
+  @ApiQuery({ name: 'radius', type: Number, required: false, description: 'Radius in km (default: 0.5)' })
+  async proximityCheck(
+    @Query('latitude') latitude: number,
+    @Query('longitude') longitude: number,
+    @Query('radius') radius = 0.5,
+  ) {
+    return this.emergencyService.checkProximityAlerts(latitude, longitude, Number(radius));
+  }
 }

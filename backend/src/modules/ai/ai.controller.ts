@@ -94,4 +94,12 @@ export class AiController {
   async assessSeverity(@Body('issueId') issueId: string) {
     return this.aiService.assessSeverity(issueId);
   }
+
+  @Post('chat')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Chat with CommunityIQ AI assistant' })
+  @ApiBody({ schema: { properties: { message: { type: 'string' }, history: { type: 'array', items: { type: 'object', properties: { role: { type: 'string' }, content: { type: 'string' } } } } } } })
+  async chat(@Body() body: { message: string; history?: Array<{ role: string; content: string }> }) {
+    return this.aiService.chat(body.message, body.history);
+  }
 }

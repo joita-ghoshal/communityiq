@@ -1,96 +1,106 @@
-'use client';
-import { usePathname } from 'next/navigation';
-import { BellIcon, MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
-import { useNotificationStore } from '@/stores/notification.store';
-import { useUIStore } from '@/stores/ui.store';
-import { useAuthStore } from '@/stores/auth.store';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useState } from 'react';
+"use client";
 
-const pageTitles: Record<string, string> = {
-  '/': 'Dashboard',
-  '/report': 'Report Issue',
-  '/map': 'Live Map',
-  '/ai-assistant': 'AI Assistant',
-  '/emergency': 'Emergency Center',
-  '/analytics': 'Analytics',
-  '/government': 'Government Operations',
-  '/heroes': 'Community Heroes',
-  '/profile': 'Profile',
-  '/settings': 'Settings',
-};
+import React from "react";
+import Link from "next/link";
+import { useAuth } from "@/hooks/useAuth";
+import { useTranslation } from "react-i18next";
+import {
+  Bell,
+  Search,
+  Moon,
+  Sun,
+  Globe,
+  Menu,
+  ChevronLeft,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useTheme } from "next-themes";
 
-export default function Header() {
-  const pathname = usePathname();
-  const { unreadCount, notifications, markAsRead, markAllRead } = useNotificationStore();
-  const { toggleSidebar } = useUIStore();
-  const [showNotifs, setShowNotifs] = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
+interface HeaderProps {
+  onToggleMobileMenu?: () => void;
+  showBackButton?: boolean;
+}
 
-  const title = pageTitles[pathname] || 'CommunityIQ';
+export default function Header({ onToggleMobileMenu, showBackButton }: HeaderProps) {
+  const { user } = useAuth();
+  const { t, i18n } = useTranslation();
+  const { theme, setTheme } = useTheme();
+
+  const toggleTheme = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
+  };
+
+  const toggleLanguage = () => {
+    const langs = ["en", "hi", "bn", "ta", "te", "mr", "gu", "kn", "ml", "pa"];
+    const currentIndex = langs.indexOf(i18n.language);
+    const nextIndex = (currentIndex + 1) % langs.length;
+    i18n.changeLanguage(langs[nextIndex]);
+  };
 
   return (
-    <header className="sticky top-0 z-30 h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-b border-slate-200/50 dark:border-slate-700/50 flex items-center justify-between px-4 md:px-6">
-      <div className="flex items-center gap-3">
-        <button onClick={toggleSidebar} className="lg:hidden p-2 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-          <Bars3Icon className="w-5 h-5" />
-        </button>
-        <div>
-          <h2 className="text-lg font-bold font-heading text-slate-900 dark:text-white">{title}</h2>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <span>CommunityIQ</span>
-            <span>/</span>
-            <span className="text-blue-600 dark:text-blue-400">{title}</span>
+    <header className="sticky top-0 z-30 border-b border-white/20 dark:border-slate-700/30 glass-card !rounded-none backdrop-blur-2xl bg-white/60 dark:bg-[hsl(222,33%,8%)]/60">
+      <div className="flex items-center justify-between h-16 px-4 md:px-6">
+        {/* Left side */}
+        <div className="flex items-center gap-3">
+          {showBackButton && (
+            <button
+              onClick={() => window.history.back()}
+              className="p-2 rounded-xl hover:bg-white/30 dark:hover:bg-slate-700/40 transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+            </button>
+          )}
+          <button
+            onClick={onToggleMobileMenu}
+            className="lg:hidden p-2 rounded-xl hover:bg-white/30 dark:hover:bg-slate-700/40 transition-colors"
+          >
+            <Menu className="w-5 h-5 text-slate-600 dark:text-slate-300" />
+          </button>
+          <div className="hidden md:flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/30 dark:border-slate-700/40 bg-white/30 dark:bg-slate-800/30 backdrop-blur-sm w-80 transition-all focus-within:border-blue-400 dark:focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-500/10">
+            <Search className="w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder={t("nav.search")}
+              className="bg-transparent border-none outline-none text-sm w-full placeholder:text-slate-400 dark:placeholder:text-slate-500"
+            />
           </div>
         </div>
-      </div>
 
-      <div className="flex items-center gap-2">
-        {/* Search */}
-        <AnimatePresence>
-          {searchOpen && (
-            <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: 256, opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="overflow-hidden">
-              <input autoFocus type="text" placeholder="Search issues, users..." className="input-field text-sm !py-2" onBlur={() => setSearchOpen(false)} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-        <button onClick={() => setSearchOpen(!searchOpen)} className="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-          <MagnifyingGlassIcon className="w-5 h-5 text-slate-500" />
-        </button>
-
-        {/* Notifications */}
-        <div className="relative">
-          <button onClick={() => setShowNotifs(!showNotifs)} className="p-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative">
-            <BellIcon className="w-5 h-5 text-slate-500" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center animate-bounce">{unreadCount > 9 ? '9+' : unreadCount}</span>
+        {/* Right side */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={toggleLanguage}
+            className="p-2.5 rounded-xl hover:bg-white/30 dark:hover:bg-slate-700/40 transition-colors group relative"
+            title="Change Language"
+          >
+            <Globe className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-blue-500 transition-colors" />
+          </button>
+          <button
+            onClick={toggleTheme}
+            className="p-2.5 rounded-xl hover:bg-white/30 dark:hover:bg-slate-700/40 transition-colors group"
+            title="Toggle Theme"
+          >
+            {theme === "dark" ? (
+              <Sun className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-amber-500 transition-colors" />
+            ) : (
+              <Moon className="w-5 h-5 text-slate-500 group-hover:text-blue-600 transition-colors" />
             )}
           </button>
-          <AnimatePresence>
-            {showNotifs && (
-              <motion.div
-                initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                className="absolute right-0 top-12 w-80 max-h-96 overflow-y-auto glass-card-strong p-2 shadow-2xl"
-              >
-                <div className="flex items-center justify-between p-2 border-b border-slate-200/50 dark:border-slate-700/50">
-                  <h3 className="font-semibold text-sm">Notifications</h3>
-                  {unreadCount > 0 && <button onClick={markAllRead} className="text-xs text-blue-600 hover:underline">Mark all read</button>}
-                </div>
-                {notifications.length === 0 ? (
-                  <p className="text-center text-sm text-slate-500 py-8">No notifications</p>
-                ) : (
-                  notifications.slice(0, 10).map((n) => (
-                    <div key={n.id} onClick={() => markAsRead(n.id)} className={`p-3 rounded-xl cursor-pointer transition-colors ${n.isRead ? 'opacity-60' : 'bg-blue-50/50 dark:bg-blue-900/10 hover:bg-blue-50 dark:hover:bg-blue-900/20'}`}>
-                      <p className="text-sm font-medium text-slate-900 dark:text-white">{n.title}</p>
-                      <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.message}</p>
-                    </div>
-                  ))
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <button className="relative p-2.5 rounded-xl hover:bg-white/30 dark:hover:bg-slate-700/40 transition-colors group">
+            <Bell className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-blue-500 transition-colors" />
+            <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-800 animate-pulse" />
+          </button>
+          <Link
+            href="/profile"
+            className="flex items-center gap-3 pl-3 pr-4 py-2 rounded-xl hover:bg-white/30 dark:hover:bg-slate-700/40 transition-all group"
+          >
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-xs font-bold shadow-md shadow-blue-500/20">
+              {user?.firstName?.charAt(0)?.toUpperCase() || "U"}
+            </div>
+            <span className="hidden md:block text-sm font-semibold text-slate-700 dark:text-slate-200 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+              {user ? `${user.firstName} ${user.lastName}` : "User"}
+            </span>
+          </Link>
         </div>
       </div>
     </header>

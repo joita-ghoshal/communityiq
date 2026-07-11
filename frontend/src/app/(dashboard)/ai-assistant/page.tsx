@@ -77,7 +77,7 @@ export default function AIAssistantPage() {
 
   return (
     <AppShell>
-      <div className={`${theme.bg} ${theme.darkBg} min-h-full flex flex-col h-[calc(100vh-4rem)]`}>
+      <div className={`${theme.background} min-h-full flex flex-col h-[calc(100vh-4rem)]`}>
         {/* Header */}
         <div className="p-4 md:p-6 pb-3">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3">

@@ -17,6 +17,7 @@ import { EmergencyModule } from './modules/emergency/emergency.module';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
 import { VolunteersModule } from './modules/volunteers/volunteers.module';
 import { UploadModule } from './modules/upload/upload.module';
+import { AdminModule } from './modules/admin/admin.module';
 import { appConfig } from './config/app.config';
 import { databaseConfig } from './config/database.config';
 import { redisConfig } from './config/redis.config';
@@ -55,6 +56,7 @@ import { elasticsearchConfig } from './config/elasticsearch.config';
     AnalyticsModule,
     VolunteersModule,
     UploadModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

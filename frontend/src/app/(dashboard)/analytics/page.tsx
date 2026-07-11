@@ -53,7 +53,7 @@ export default function AnalyticsPage() {
 
   return (
     <AppShell>
-      <div className={`${theme.bg} ${theme.darkBg} min-h-full`}>
+      <div className={`${theme.background} min-h-full`}>
         <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 space-y-6">
           {/* Header */}
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

@@ -43,7 +43,7 @@ export default function EmergencyPage() {
 
   return (
     <AppShell>
-      <div className={`${theme.bg} ${theme.darkBg} min-h-full`}>
+      <div className={`${theme.background} min-h-full`}>
         {/* Red Alert Overlay */}
         <AnimatePresence>
           {showRedAlert && activeAlerts.length > 0 && (
