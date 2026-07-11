@@ -27,9 +27,10 @@ api.interceptors.response.use(
             `${api.defaults.baseURL}/auth/refresh`,
             { refreshToken }
           );
-          localStorage.setItem('access_token', data.accessToken);
-          localStorage.setItem('refresh_token', data.refreshToken);
-          originalRequest.headers.Authorization = `Bearer ${data.accessToken}`;
+          const tokens = data.data || data;
+          localStorage.setItem('access_token', tokens.accessToken);
+          localStorage.setItem('refresh_token', tokens.refreshToken);
+          originalRequest.headers.Authorization = `Bearer ${tokens.accessToken}`;
           return api(originalRequest);
         }
       } catch {

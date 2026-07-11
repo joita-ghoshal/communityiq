@@ -7,6 +7,18 @@ import { AppService } from './app.service';
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
+  @Get()
+  @ApiOperation({ summary: 'API root' })
+  @ApiResponse({ status: 200, description: 'API is running' })
+  getRoot() {
+    return {
+      name: 'CommunityIQ API',
+      version: '1.0.0',
+      docs: '/docs',
+      health: '/api/v1/health',
+    };
+  }
+
   @Get('health')
   @ApiOperation({ summary: 'Health check endpoint' })
   @ApiResponse({ status: 200, description: 'Application is healthy' })

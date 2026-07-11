@@ -1,4 +1,5 @@
 import { IsEmail, IsString, MinLength, MaxLength, IsOptional, IsEnum, Matches } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UserRole } from '../../../database/entities/user.entity';
 
@@ -31,6 +32,7 @@ export class RegisterDto {
   @ApiPropertyOptional({ example: '+919876543210' })
   @IsOptional()
   @IsString()
+  @Transform(({ value }) => (value === '' || value === null || value === undefined ? undefined : value))
   @Matches(/^\+?[1-9]\d{1,14}$/, { message: 'Invalid phone number format' })
   phone?: string;
 

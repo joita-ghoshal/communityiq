@@ -8,6 +8,33 @@ const compression = require('compression');
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
+import { DataSource } from 'typeorm';
+import { User, UserRole } from './database/entities/user.entity';
+import * as bcrypt from 'bcrypt';
+
+async function seedUsers(dataSource: DataSource) {
+  const userRepo = dataSource.getRepository(User);
+  const count = await userRepo.count();
+  if (count > 0) return;
+
+  console.log('No users found — seeding test accounts...');
+
+  const testUsers = [
+    { email: 'superadmin@test.com', firstName: 'Super', lastName: 'Admin', role: UserRole.SUPER_ADMIN, phone: '+15551000001' },
+    { email: 'municipal@test.com', firstName: 'Municipal', lastName: 'Admin', role: UserRole.MUNICIPAL_ADMIN, phone: '+15551000002' },
+    { email: 'deptadmin@test.com', firstName: 'Dept', lastName: 'Admin', role: UserRole.DEPARTMENT_ADMIN, phone: '+15551000003' },
+    { email: 'volunteer@test.com', firstName: 'Test', lastName: 'Volunteer', role: UserRole.VOLUNTEER, phone: '+15551000004' },
+    { email: 'citizen@test.com', firstName: 'Test', lastName: 'Citizen', role: UserRole.CITIZEN, phone: '+15551000005' },
+  ];
+
+  const password = await bcrypt.hash('Test@1234', 12);
+
+  for (const u of testUsers) {
+    await userRepo.save(userRepo.create({ ...u, password, isVerified: true, isActive: true }));
+    console.log(`  ✓ seeded ${u.role}: ${u.email}`);
+  }
+  console.log('Seeding complete. Password for all accounts: Test@1234');
+}
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -76,6 +103,9 @@ async function bootstrap() {
       persistAuthorization: true,
     },
   });
+
+  const dataSource = app.get(DataSource);
+  await seedUsers(dataSource);
 
   const port = configService.get<number>('PORT', 3001);
   await app.listen(port);

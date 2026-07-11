@@ -7,7 +7,7 @@ interface User {
   firstName: string;
   lastName: string;
   phone?: string;
-  role: 'citizen' | 'volunteer' | 'government_official' | 'department_manager' | 'administrator';
+  role: 'citizen' | 'volunteer' | 'department_admin' | 'municipal_admin' | 'super_admin';
   avatar?: string;
   isVerified: boolean;
 }
