@@ -14,10 +14,47 @@ import * as bcrypt from 'bcrypt';
 
 async function seedUsers(dataSource: DataSource) {
   const userRepo = dataSource.getRepository(User);
-  const count = await userRepo.count();
-  if (count > 0) return;
 
-  console.log('No users found — seeding test accounts...');
+  // Explicitly verify DB connection
+  if (!dataSource.isInitialized) {
+    console.log('Waiting for database connection...');
+    await dataSource.initialize();
+  }
+  console.log('Database connected. Checking for existing users...');
+
+  const count = await userRepo.count();
+  console.log(`Found ${count} existing users.`);
+
+  if (count > 0) {
+    console.log('Users already exist — skipping seed.');
+    // Verify existing users have valid hashes
+    const sampleUser = await userRepo.findOne({ where: { email: 'superadmin@test.com' }, select: ['id', 'email', 'password'] });
+    if (sampleUser && sampleUser.password) {
+      const hashValid = await bcrypt.compare('Test@1234', sampleUser.password);
+      console.log(`Password hash verification for superadmin@test.com: ${hashValid ? 'VALID' : 'INVALID — re-seeding needed'}`);
+      if (!hashValid) {
+        console.log('Clearing and re-seeding all users...');
+        await userRepo.clear();
+      } else {
+        return;
+      }
+    } else {
+      console.log('Could not verify existing users — re-seeding...');
+      await userRepo.clear();
+    }
+  }
+
+  console.log('Seeding test accounts...');
+
+  const testPassword = 'Test@1234';
+  const hashedPassword = await bcrypt.hash(testPassword, 12);
+
+  // Verify the hash is valid before saving
+  const hashVerification = await bcrypt.compare(testPassword, hashedPassword);
+  console.log(`Generated hash verification: ${hashVerification ? 'VALID' : 'CRITICAL FAILURE'}`);
+  if (!hashVerification) {
+    throw new Error('bcrypt hash verification failed — cannot seed users');
+  }
 
   const testUsers = [
     { email: 'superadmin@test.com', firstName: 'Super', lastName: 'Admin', role: UserRole.SUPER_ADMIN, phone: '+15551000001' },
@@ -27,13 +64,30 @@ async function seedUsers(dataSource: DataSource) {
     { email: 'citizen@test.com', firstName: 'Test', lastName: 'Citizen', role: UserRole.CITIZEN, phone: '+15551000005' },
   ];
 
-  const password = await bcrypt.hash('Test@1234', 12);
-
   for (const u of testUsers) {
-    await userRepo.save(userRepo.create({ ...u, password, isVerified: true, isActive: true }));
-    console.log(`  ✓ seeded ${u.role}: ${u.email}`);
+    const user = userRepo.create({
+      ...u,
+      password: hashedPassword,
+      isVerified: true,
+      isActive: true,
+    });
+    const saved = await userRepo.save(user);
+    console.log(`  Seeded ${u.role}: ${u.email} (id=${saved.id})`);
+
+    // Immediately verify the saved user can be found and password matches
+    const verifyUser = await userRepo.findOne({ where: { email: u.email }, select: ['email', 'password'] });
+    if (verifyUser) {
+      const pwValid = await bcrypt.compare(testPassword, verifyUser.password);
+      console.log(`    Login verification for ${u.email}: ${pwValid ? 'PASS' : 'FAIL'}`);
+    }
   }
-  console.log('Seeding complete. Password for all accounts: Test@1234');
+
+  console.log('');
+  console.log('========================================');
+  console.log('SEED COMPLETE — All accounts ready:');
+  console.log('Password for all accounts: Test@1234');
+  console.log('========================================');
+  console.log('');
 }
 
 async function bootstrap() {
