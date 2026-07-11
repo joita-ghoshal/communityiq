@@ -52,7 +52,7 @@ export class EmergencyController {
   }
 
   @Get('alerts/nearby')
-  @ApiOperation({ summary: 'Get alerts near a location' })
+  @ApiOperation({ summary: 'Get alerts near a location (PostGIS)' })
   @ApiQuery({ name: 'lat', type: Number })
   @ApiQuery({ name: 'lng', type: Number })
   @ApiQuery({ name: 'radius', type: Number, required: false })
