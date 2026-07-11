@@ -1,0 +1,30 @@
+{
+  "name": "@communityiq/shared",
+  "version": "1.0.0",
+  "description": "Shared types and utilities for CommunityIQ platform",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "npm run build",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "communityiq",
+    "shared",
+    "types",
+    "typescript"
+  ],
+  "author": "CommunityIQ Team",
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
