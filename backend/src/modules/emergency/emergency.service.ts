@@ -10,6 +10,22 @@ export class EmergencyService {
     private readonly alertRepo: Repository<EmergencyAlert>,
   ) {}
 
+  private haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371;
+    const dLat = this.toRad(lat2 - lat1);
+    const dLon = this.toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  private toRad(deg: number): number {
+    return deg * (Math.PI / 180);
+  }
+
   async createAlert(data: any, userId: string) {
     const alert = this.alertRepo.create({
       type: data.type as AlertType,
@@ -71,5 +87,54 @@ export class EmergencyService {
     const alert = await this.alertRepo.findOne({ where: { id } });
     if (!alert) throw new NotFoundException('Alert not found');
     return alert;
+  }
+
+  async findNearbyAlerts(latitude: number, longitude: number, radiusKm: number = 10) {
+    const activeAlerts = await this.alertRepo.find({
+      where: { isActive: true },
+      order: { severity: 'DESC', createdAt: 'DESC' },
+    });
+
+    const alertsWithDistance = activeAlerts
+      .map((alert) => {
+        let alertLat: number | null = null;
+        let alertLng: number | null = null;
+
+        if (alert.location) {
+          const loc = alert.location as any;
+          if (typeof loc === 'object' && loc.coordinates) {
+            alertLng = loc.coordinates[0];
+            alertLat = loc.coordinates[1];
+          } else if (typeof loc === 'string') {
+            const match = loc.match(/(-?\d+\.?\d*)\s+(-?\d+\.?\d*)/);
+            if (match) {
+              alertLng = parseFloat(match[1]);
+              alertLat = parseFloat(match[2]);
+            }
+          }
+        }
+
+        if (alertLat === null || alertLng === null) {
+          if (alert.affectedArea?.coordinates?.[0]?.[0]) {
+            const coords = alert.affectedArea.coordinates[0][0];
+            alertLng = coords[0];
+            alertLat = coords[1];
+          }
+        }
+
+        if (alertLat === null || alertLng === null) {
+          return { ...alert, distance: Infinity };
+        }
+
+        const distance = this.haversine(latitude, longitude, alertLat, alertLng);
+        return { ...alert, distance: Math.round(distance * 100) / 100 };
+      })
+      .filter((alert) => alert.distance <= radiusKm)
+      .sort((a, b) => a.distance - b.distance);
+
+    return {
+      alerts: alertsWithDistance,
+      count: alertsWithDistance.length,
+    };
   }
 }

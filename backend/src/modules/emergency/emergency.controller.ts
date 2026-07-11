@@ -64,6 +64,19 @@ export class EmergencyController {
     return this.emergencyService.getNearbyAlerts(lat, lng, radius);
   }
 
+  @Get('nearby')
+  @ApiOperation({ summary: 'Find emergency alerts within radius using geofencing (haversine)' })
+  @ApiQuery({ name: 'latitude', type: Number })
+  @ApiQuery({ name: 'longitude', type: Number })
+  @ApiQuery({ name: 'radius', type: Number, required: false, description: 'Radius in km (default: 10)' })
+  async findNearby(
+    @Query('latitude') latitude: number,
+    @Query('longitude') longitude: number,
+    @Query('radius') radius = 10,
+  ) {
+    return this.emergencyService.findNearbyAlerts(latitude, longitude, radius);
+  }
+
   @Get('alerts/:id')
   @ApiOperation({ summary: 'Get alert by ID' })
   @ApiParam({ name: 'id', type: String })

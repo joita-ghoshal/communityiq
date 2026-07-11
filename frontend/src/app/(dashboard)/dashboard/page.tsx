@@ -1,67 +1,64 @@
 'use client';
 import { motion } from 'framer-motion';
-import { useAuth } from '@/hooks/useAuth';
+import {
+  ExclamationTriangleIcon, CheckCircleIcon, ClockIcon, FireIcon,
+  MagnifyingGlassIcon, PhotoIcon, ChartBarIcon, ArrowRightIcon,
+} from '@heroicons/react/24/outline';
 import AppShell from '@/components/layout/AppShell';
 import StatsCard from '@/components/dashboard/StatsCard';
 import RecentIssues from '@/components/dashboard/RecentIssues';
-import ActivityTimeline from '@/components/dashboard/ActivityTimeline';
 import AIInsights from '@/components/dashboard/AIInsights';
-import QuickActions from '@/components/dashboard/QuickActions';
-import { pageThemes } from '@/lib/theme/page-themes';
-import {
-  ExclamationTriangleIcon, CheckCircleIcon, ClockIcon, FireIcon,
-  ArrowUpIcon, ArrowTrendingUpIcon,
-} from '@heroicons/react/24/outline';
+import ActivityTimeline from '@/components/dashboard/ActivityTimeline';
+import Link from 'next/link';
+
+const stats = [
+  { title: 'Total Issues', value: '2,847', change: 12, changeLabel: 'vs last month', icon: ExclamationTriangleIcon, color: 'blue', gradient: 'bg-gradient-to-br from-blue-500 to-blue-600 shadow-blue-200 dark:shadow-blue-900/50', href: '/report' },
+  { title: 'Resolved', value: '1,923', change: 8, changeLabel: 'vs last month', icon: CheckCircleIcon, color: 'emerald', gradient: 'bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-emerald-200 dark:shadow-emerald-900/50', href: '/analytics' },
+  { title: 'In Progress', value: '634', change: -3, changeLabel: 'vs last month', icon: ClockIcon, color: 'amber', gradient: 'bg-gradient-to-br from-amber-500 to-orange-500 shadow-amber-200 dark:shadow-amber-900/50', href: '/map' },
+  { title: 'Emergency', value: '12', change: 25, changeLabel: 'critical alerts active', icon: FireIcon, color: 'red', gradient: 'bg-gradient-to-br from-red-500 to-rose-600 shadow-red-200 dark:shadow-red-900/50', href: '/emergency' },
+];
+
+const quickActions = [
+  { label: 'Report Issue', icon: ExclamationTriangleIcon, color: 'from-blue-500 to-indigo-600', href: '/report' },
+  { label: 'Verify Issue', icon: PhotoIcon, color: 'from-emerald-500 to-teal-600', href: '/map' },
+  { label: 'View Analytics', icon: ChartBarIcon, color: 'from-violet-500 to-purple-600', href: '/analytics' },
+  { label: 'Find Nearby', icon: MagnifyingGlassIcon, color: 'from-amber-500 to-orange-600', href: '/map' },
+];
 
 export default function DashboardPage() {
-  const { user, isLoading } = useAuth();
-
-  const stats = [
-    { label: 'Total Issues', value: '2,847', change: '+12%', up: true, icon: ExclamationTriangleIcon, color: 'from-blue-500 to-indigo-600' },
-    { label: 'Resolved', value: '1,923', change: '+8%', up: true, icon: CheckCircleIcon, color: 'from-emerald-500 to-green-600' },
-    { label: 'In Progress', value: '486', change: '-3%', up: false, icon: ClockIcon, color: 'from-amber-500 to-orange-600' },
-    { label: 'Emergency Active', value: '3', change: '+1', up: true, icon: FireIcon, color: 'from-red-500 to-rose-600' },
-  ];
-
   return (
     <AppShell>
-      <div className="bg-gray-50 dark:bg-black min-h-full">
-        <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 space-y-6">
-          {/* Welcome Banner */}
+      <div className="min-h-full bg-slate-50 dark:bg-slate-950">
+        <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
+          {/* Hero Banner */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-600 rounded-2xl p-6 md:p-8 text-white relative overflow-hidden"
+            className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 p-6 md:p-8 text-white mb-8 shadow-xl"
           >
-            <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIvPjwvc3ZnPg==')] opacity-50" />
+            <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10" />
             <div className="relative z-10">
-              <h1 className="text-2xl md:text-3xl font-bold">
-                Welcome back, {user?.firstName || 'User'}
-              </h1>
-              <p className="text-white/80 mt-2 text-sm md:text-base">
-                Here&apos;s what&apos;s happening in your community today. Your engagement makes a difference.
-              </p>
-              <div className="flex items-center gap-4 mt-4">
-                <div className="flex items-center gap-1.5 bg-white/20 rounded-lg px-3 py-1.5 text-sm backdrop-blur-sm">
-                  <ArrowTrendingUpIcon className="w-4 h-4" />
-                  <span>Community Health: <strong>87%</strong></span>
-                </div>
-                <div className="flex flex-wrap items-center gap-1.5 bg-white/20 rounded-lg px-3 py-1.5 text-sm backdrop-blur-sm">
-                  <ArrowUpIcon className="w-4 h-4" />
-                  <span>Resolution Rate: <strong>92%</strong></span>
-                </div>
+              <h1 className="text-2xl md:text-3xl font-bold font-heading">Welcome back to CommunityIQ</h1>
+              <p className="text-blue-100 mt-2 text-sm md:text-base">Your AI-powered civic intelligence platform. Monitor, report, and resolve community issues.</p>
+              <div className="flex flex-wrap gap-3 mt-5">
+                <Link href="/report" className="inline-flex items-center gap-2 bg-white/20 hover:bg-white/30 backdrop-blur px-4 py-2 rounded-xl text-sm font-medium transition-all">
+                  <ExclamationTriangleIcon className="w-4 h-4" /> Report Issue
+                </Link>
+                <Link href="/map" className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur px-4 py-2 rounded-xl text-sm font-medium transition-all">
+                  <MagnifyingGlassIcon className="w-4 h-4" /> Explore Map
+                </Link>
               </div>
             </div>
           </motion.div>
 
           {/* Stats Grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             {stats.map((stat, i) => (
               <motion.div
-                key={stat.label}
+                key={stat.title}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 * (i + 1) }}
+                transition={{ delay: 0.1 * i }}
               >
                 <StatsCard {...stat} />
               </motion.div>
@@ -69,8 +66,26 @@ export default function DashboardPage() {
           </div>
 
           {/* Quick Actions */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
-            <QuickActions />
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="mb-8"
+          >
+            <h3 className="text-lg font-bold font-heading text-slate-900 dark:text-white mb-4">Quick Actions</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {quickActions.map((action, i) => (
+                <Link key={action.label} href={action.href}>
+                  <motion.div
+                    whileHover={{ y: -2, scale: 1.02 }}
+                    className={`bg-gradient-to-br ${action.color} rounded-2xl p-4 text-white cursor-pointer shadow-lg hover:shadow-xl transition-all`}
+                  >
+                    <action.icon className="w-6 h-6 mb-2" />
+                    <p className="text-sm font-semibold">{action.label}</p>
+                  </motion.div>
+                </Link>
+              ))}
+            </div>
           </motion.div>
 
           {/* Main Content Grid */}
@@ -81,14 +96,13 @@ export default function DashboardPage() {
                 <RecentIssues />
               </motion.div>
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-                <AIInsights />
+                <ActivityTimeline />
               </motion.div>
             </div>
-
             {/* Right Column */}
             <div className="space-y-6">
-              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
-                <ActivityTimeline />
+              <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.45 }}>
+                <AIInsights />
               </motion.div>
             </div>
           </div>

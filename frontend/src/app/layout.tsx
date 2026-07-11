@@ -4,6 +4,7 @@ import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import { AuthProvider } from '@/components/providers/AuthProvider';
 import { Toaster } from 'react-hot-toast';
+import I18nProvider from '@/lib/i18n/provider';
 
 export const metadata: Metadata = {
   title: 'CommunityIQ — AI-Powered Civic Intelligence Platform',
@@ -26,8 +27,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <QueryProvider>
             <AuthProvider>
-              {children}
-              <Toaster position="top-right" toastOptions={{ duration: 4000, style: { background: '#1e293b', color: '#f8fafc', borderRadius: '12px', padding: '12px 16px', fontSize: '14px' } }} />
+              <I18nProvider>
+                {children}
+                <Toaster position="top-right" toastOptions={{ duration: 4000, style: { background: '#1e293b', color: '#f8fafc', borderRadius: '12px', padding: '12px 16px', fontSize: '14px' } }} />
+              </I18nProvider>
             </AuthProvider>
           </QueryProvider>
         </ThemeProvider>

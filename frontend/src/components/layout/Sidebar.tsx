@@ -14,14 +14,14 @@ import { useTheme } from 'next-themes';
 import { cn, getInitials } from '@/lib/utils';
 
 const navItems = [
-  { href: '/', label: 'Dashboard', icon: HomeIcon, roles: ['citizen', 'volunteer', 'government_official', 'department_manager', 'administrator'] },
+  { href: '/', label: 'Dashboard', icon: HomeIcon, roles: ['citizen', 'volunteer', 'department_admin', 'municipal_admin', 'super_admin'] },
   { href: '/report', label: 'Report Issue', icon: ExclamationTriangleIcon, roles: ['citizen', 'volunteer'] },
-  { href: '/map', label: 'Live Map', icon: MapIcon, roles: ['citizen', 'volunteer', 'government_official', 'department_manager', 'administrator'] },
-  { href: '/ai-assistant', label: 'AI Assistant', icon: SparklesIcon, roles: ['citizen', 'volunteer', 'government_official', 'department_manager', 'administrator'] },
-  { href: '/emergency', label: 'Emergency', icon: FireIcon, roles: ['citizen', 'volunteer', 'government_official', 'department_manager', 'administrator'] },
-  { href: '/analytics', label: 'Analytics', icon: ChartBarIcon, roles: ['government_official', 'department_manager', 'administrator'] },
-  { href: '/government', label: 'Operations', icon: BuildingOffice2Icon, roles: ['government_official', 'department_manager', 'administrator'] },
-  { href: '/heroes', label: 'Community Heroes', icon: TrophyIcon, roles: ['citizen', 'volunteer', 'government_official', 'department_manager', 'administrator'] },
+  { href: '/map', label: 'Live Map', icon: MapIcon, roles: ['citizen', 'volunteer', 'department_admin', 'municipal_admin', 'super_admin'] },
+  { href: '/ai-assistant', label: 'AI Assistant', icon: SparklesIcon, roles: ['citizen', 'volunteer', 'department_admin', 'municipal_admin', 'super_admin'] },
+  { href: '/emergency', label: 'Emergency', icon: FireIcon, roles: ['citizen', 'volunteer', 'department_admin', 'municipal_admin', 'super_admin'] },
+  { href: '/analytics', label: 'Analytics', icon: ChartBarIcon, roles: ['department_admin', 'municipal_admin', 'super_admin'] },
+  { href: '/government', label: 'Operations', icon: BuildingOffice2Icon, roles: ['municipal_admin', 'super_admin'] },
+  { href: '/heroes', label: 'Community Heroes', icon: TrophyIcon, roles: ['citizen', 'volunteer', 'department_admin', 'municipal_admin', 'super_admin'] },
 ];
 
 const bottomItems = [

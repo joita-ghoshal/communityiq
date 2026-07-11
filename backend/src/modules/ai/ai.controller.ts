@@ -17,10 +17,26 @@ export class AiController {
 
   @Post('analyze')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Analyze an issue with AI' })
-  @ApiBody({ schema: { properties: { issueId: { type: 'string' } } } })
-  async analyze(@Body('issueId') issueId: string) {
-    return this.aiService.analyzeIssue(issueId);
+  @ApiOperation({ summary: 'Analyze issue data with AI for severity and priority' })
+  @ApiBody({ schema: { properties: { title: { type: 'string' }, description: { type: 'string' }, category: { type: 'string' }, latitude: { type: 'number' }, longitude: { type: 'number' } } } })
+  async analyze(@Body() body: { title: string; description: string; category: string; latitude: number; longitude: number }) {
+    return this.aiService.analyzeIssue(body);
+  }
+
+  @Post('verify-image')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify an image against issue description and category using AI Vision' })
+  @ApiBody({ schema: { properties: { imageBase64: { type: 'string' }, description: { type: 'string' }, category: { type: 'string' } } } })
+  async verifyImage(@Body() body: { imageBase64: string; description: string; category: string }) {
+    return this.aiService.verifyImage(body.imageBase64, body.description, body.category);
+  }
+
+  @Post('insights')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Generate AI insights from a collection of issues' })
+  @ApiBody({ schema: { properties: { issues: { type: 'array', items: { type: 'object' } } } } })
+  async insights(@Body('issues') issues: any[]) {
+    return this.aiService.generateInsights(issues);
   }
 
   @Post('classify')

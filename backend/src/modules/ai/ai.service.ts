@@ -1,7 +1,9 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { HttpService } from '@nestjs/axios';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { firstValueFrom } from 'rxjs';
 import axios from 'axios';
 import { Issue, IssueCategory, IssuePriority, IssueStatus } from '../../database/entities/issue.entity';
 
@@ -15,6 +17,7 @@ export class AiService {
 
   constructor(
     private readonly configService: ConfigService,
+    private readonly httpService: HttpService,
     @InjectRepository(Issue)
     private readonly issueRepository: Repository<Issue>,
   ) {
@@ -24,7 +27,7 @@ export class AiService {
     this.openaiModel = this.configService.get<string>('OPENAI_MODEL', 'gpt-4');
   }
 
-  async analyzeIssue(issueId: string) {
+  async analyzeIssueById(issueId: string) {
     const issue = await this.issueRepository.findOne({ where: { id: issueId } });
     if (!issue) throw new NotFoundException(`Issue ${issueId} not found`);
 
@@ -41,6 +44,263 @@ export class AiService {
 
     await this.issueRepository.update(issueId, { aiAnalysis: analysis });
     return { issueId, analysis, timestamp: new Date().toISOString() };
+  }
+
+  async analyzeIssue(issueData: { title: string; description: string; category: string; latitude: number; longitude: number }) {
+    if (this.openaiApiKey) {
+      try {
+        const prompt = `You are a civic issue analyst. Analyze the following reported issue and provide a severity assessment and priority suggestion.
+
+Title: ${issueData.title}
+Description: ${issueData.description}
+Category: ${issueData.category}
+Location: (${issueData.latitude}, ${issueData.longitude})
+
+Respond in JSON format only:
+{
+  "suggestedPriority": "<low|medium|high|critical|emergency>",
+  "suggestedCategory": "<best matching category from: road_damage, water_supply, sanitation, electricity, garbage, drainage, street_lighting, public_safety, noise_pollution, air_pollution, parks_green, traffic, building_safety, flooding, animal_control, other>",
+  "severityScore": <number 1-10>,
+  "analysis": "<2-3 sentence analysis of the issue severity, potential impact, and why this priority was assigned>"
+}`;
+
+        const response = await firstValueFrom(
+          this.httpService.post(
+            'https://api.openai.com/v1/chat/completions',
+            {
+              model: 'gpt-4-vision-preview',
+              messages: [{ role: 'user', content: prompt }],
+              temperature: 0.3,
+              max_tokens: 500,
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${this.openaiApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              timeout: 30000,
+            },
+          ),
+        );
+
+        const content = response.data.choices[0].message.content;
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]);
+        }
+      } catch (e: any) {
+        this.logger.error('OpenAI analyzeIssue error', e.message);
+      }
+    }
+
+    return this.mockAnalyzeIssue(issueData);
+  }
+
+  async verifyImage(imageBase64: string, description: string, category: string) {
+    if (this.openaiApiKey) {
+      try {
+        const prompt = `You are an image verification AI for a civic issue reporting platform. Analyze the provided image and verify whether it matches the reported issue description and category.
+
+Description: ${description}
+Category: ${category}
+
+Respond in JSON format only:
+{
+  "verified": <true if image appears to match the description>,
+  "confidence": <number 0-1>,
+  "analysis": "<2-3 sentences describing what you see in the image and whether it matches the description>",
+  "categoryMatch": <true if the image content matches the claimed category>,
+  "descriptionMatch": <true if the image content matches the provided description>
+}`;
+
+        const response = await firstValueFrom(
+          this.httpService.post(
+            'https://api.openai.com/v1/chat/completions',
+            {
+              model: 'gpt-4-vision-preview',
+              messages: [
+                {
+                  role: 'user',
+                  content: [
+                    { type: 'text', text: prompt },
+                    {
+                      type: 'image_url',
+                      image_url: {
+                        url: imageBase64.startsWith('data:')
+                          ? imageBase64
+                          : `data:image/jpeg;base64,${imageBase64}`,
+                      },
+                    },
+                  ],
+                },
+              ],
+              temperature: 0.3,
+              max_tokens: 500,
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${this.openaiApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              timeout: 30000,
+            },
+          ),
+        );
+
+        const content = response.data.choices[0].message.content;
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]);
+        }
+      } catch (e: any) {
+        this.logger.error('OpenAI verifyImage error', e.message);
+      }
+    }
+
+    return this.mockVerifyImage(description, category);
+  }
+
+  async generateInsights(issues: any[]) {
+    if (this.openaiApiKey) {
+      try {
+        const issueSummary = issues.slice(0, 50).map((i: any) =>
+          `- ${i.title} | ${i.category} | ${i.status || 'open'} | priority: ${i.priority || 'medium'}`
+        ).join('\n');
+
+        const prompt = `You are a civic intelligence AI. Analyze the following community issues and generate actionable insights.
+
+Issues (${issues.length} total):
+${issueSummary}
+
+Respond in JSON format only:
+{
+  "insights": [
+    {
+      "title": "<short insight title>",
+      "description": "<detailed description of the insight>",
+      "type": "<trend|pattern|recommendation>"
+    }
+  ]
+}
+
+Provide 3-5 insights covering trends, patterns, and recommendations.`;
+
+        const response = await firstValueFrom(
+          this.httpService.post(
+            'https://api.openai.com/v1/chat/completions',
+            {
+              model: 'gpt-4-vision-preview',
+              messages: [{ role: 'user', content: prompt }],
+              temperature: 0.5,
+              max_tokens: 1000,
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${this.openaiApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              timeout: 30000,
+            },
+          ),
+        );
+
+        const content = response.data.choices[0].message.content;
+        const jsonMatch = content.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          return JSON.parse(jsonMatch[0]);
+        }
+      } catch (e: any) {
+        this.logger.error('OpenAI generateInsights error', e.message);
+      }
+    }
+
+    return this.mockGenerateInsights(issues);
+  }
+
+  private mockAnalyzeIssue(issueData: { title: string; description: string; category: string; latitude: number; longitude: number }) {
+    const categoryPriorityMap: Record<string, string> = {
+      public_safety: 'high',
+      building_safety: 'critical',
+      flooding: 'high',
+      electricity: 'high',
+      road_damage: 'medium',
+      water_supply: 'medium',
+      drainage: 'medium',
+      garbage: 'low',
+      street_lighting: 'low',
+      noise_pollution: 'low',
+    };
+
+    const severityMap: Record<string, number> = {
+      public_safety: 8,
+      building_safety: 9,
+      flooding: 7,
+      electricity: 7,
+      road_damage: 5,
+      water_supply: 5,
+      drainage: 5,
+      garbage: 3,
+      street_lighting: 3,
+      noise_pollution: 2,
+    };
+
+    const descLength = issueData.description?.length || 0;
+    const basePriority = categoryPriorityMap[issueData.category] || 'medium';
+    const baseSeverity = severityMap[issueData.category] || 5;
+    const severityAdjust = descLength > 200 ? 1 : descLength < 30 ? -1 : 0;
+
+    const priorities = ['low', 'medium', 'high', 'critical', 'emergency'];
+    let priorityIndex = priorities.indexOf(basePriority);
+    if (severityAdjust > 0) priorityIndex = Math.min(priorityIndex + 1, 4);
+    if (severityAdjust < 0) priorityIndex = Math.max(priorityIndex - 1, 0);
+
+    return {
+      suggestedPriority: priorities[priorityIndex],
+      suggestedCategory: issueData.category,
+      severityScore: Math.min(10, Math.max(1, baseSeverity + severityAdjust)),
+      analysis: `Issue "${issueData.title}" categorized as ${issueData.category}. Based on the description and category, this has been assigned ${priorities[priorityIndex]} priority. Severity score reflects potential community impact.`,
+    };
+  }
+
+  private mockVerifyImage(description: string, category: string) {
+    const confidence = 0.5 + Math.random() * 0.4;
+    const verified = confidence > 0.6;
+    return {
+      verified,
+      confidence: Math.round(confidence * 100) / 100,
+      analysis: `Simulated verification: The image was evaluated against the description "${description.substring(0, 100)}" for category "${category}". ${verified ? 'The image appears to be consistent with the reported issue.' : 'Could not fully confirm the image matches the reported issue.'}`,
+      categoryMatch: Math.random() > 0.3,
+      descriptionMatch: confidence > 0.5,
+    };
+  }
+
+  private mockGenerateInsights(issues: any[]) {
+    const categoryCounts: Record<string, number> = {};
+    issues.forEach((i: any) => {
+      categoryCounts[i.category] = (categoryCounts[i.category] || 0) + 1;
+    });
+
+    const topCategory = Object.entries(categoryCounts).sort((a: any, b: any) => b[1] - a[1])[0];
+
+    return {
+      insights: [
+        {
+          title: 'Issue Distribution Trend',
+          description: `Out of ${issues.length} reported issues, ${topCategory ? `${topCategory[0]} leads with ${topCategory[1]} reports` : 'issues are spread across categories'}. Consider allocating resources to address the most reported category.`,
+          type: 'trend' as const,
+        },
+        {
+          title: 'Geographic Clustering',
+          description: 'Multiple issues are concentrated in similar areas. This suggests systemic infrastructure problems that could be addressed with comprehensive area development plans.',
+          type: 'pattern' as const,
+        },
+        {
+          title: 'Resolution Priority',
+          description: `With ${issues.length} active issues, focusing on high-priority categories first will maximize community impact. Consider prioritizing safety-related issues.`,
+          type: 'recommendation' as const,
+        },
+      ],
+    };
   }
 
   async classifyIssue(text: string) {
