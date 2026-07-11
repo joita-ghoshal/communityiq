@@ -132,12 +132,17 @@ export class IssuesService {
     const issue = this.issueRepository.create({
       ...createIssueDto,
       reporterId: userId,
-      location: createIssueDto.latitude && createIssueDto.longitude
-        ? () => `ST_SetSRID(ST_MakePoint(${createIssueDto.longitude}, ${createIssueDto.latitude}), 4326)`
-        : undefined,
-    });
+      location: undefined as any,
+    } as any);
 
-    const saved = await this.issueRepository.save(issue);
+    const saved = await this.issueRepository.save(issue) as any;
+
+    if (createIssueDto.latitude && createIssueDto.longitude) {
+      await this.issueRepository.query(
+        `UPDATE issues SET location = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE id = $3`,
+        [createIssueDto.longitude, createIssueDto.latitude, saved.id],
+      );
+    }
 
     await this.addTimelineEvent(saved.id, TimelineAction.CREATED, userId, {
       title: saved.title,

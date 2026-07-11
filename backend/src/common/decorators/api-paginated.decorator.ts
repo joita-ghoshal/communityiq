@@ -1,5 +1,5 @@
 import { applyDecorators } from '@nestjs/common';
-import { ApiOkResponse, ApiPaginationQuery, getSchemaPath } from '@nestjs/swagger';
+import { ApiOkResponse, getSchemaPath } from '@nestjs/swagger';
 
 export function ApiPaginatedResponse(model: any) {
   return applyDecorators(

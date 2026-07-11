@@ -16,18 +16,25 @@ export class EmergencyService {
       severity: data.severity as AlertSeverity,
       title: data.title,
       description: data.description,
-      location: data.latitude && data.longitude
-        ? () => `ST_SetSRID(ST_MakePoint(${data.longitude}, ${data.latitude}), 4326)`
-        : undefined,
+      location: undefined as any,
       affectedArea: data.affectedArea,
       reportedBy: userId,
       evacuationRequired: data.evacuationRequired || false,
       contactNumber: data.contactNumber,
       expiresAt: data.expiresAt,
       isActive: true,
-    });
+    } as any);
 
-    return this.alertRepo.save(alert);
+    const saved = await this.alertRepo.save(alert) as any;
+
+    if (data.latitude && data.longitude) {
+      await this.alertRepo.query(
+        `UPDATE emergency_alerts SET location = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE id = $3`,
+        [data.longitude, data.latitude, saved.id],
+      );
+    }
+
+    return saved;
   }
 
   async resolveAlert(id: string, userId: string) {

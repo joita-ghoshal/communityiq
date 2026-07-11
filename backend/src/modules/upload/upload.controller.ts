@@ -49,7 +49,7 @@ export class UploadController {
 
   @Post('multiple')
   @UseGuards(JwtAuthGuard)
-  @UseInterceptors(FileInterceptor('files', { limits: { fileSize: 10 * 1024 * 1024 }, files: 10 }))
+  @UseInterceptors(FileInterceptor('files', { limits: { fileSize: 10 * 1024 * 1024 } }))
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Upload multiple files' })
   @ApiConsumes('multipart/form-data')

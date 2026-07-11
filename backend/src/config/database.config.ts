@@ -13,7 +13,4 @@ export const databaseConfig = registerAs('database', (): TypeOrmModuleOptions =>
   logging: process.env.DB_LOGGING === 'true',
   entities: [__dirname + '/../database/entities/*.entity{.ts,.js}'],
   migrations: [__dirname + '/../database/migrations/*{.ts,.js}'],
-  cli: {
-    migrationsDir: 'src/database/migrations',
-  },
-}));
+} as any));
