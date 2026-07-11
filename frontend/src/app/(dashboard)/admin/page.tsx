@@ -192,7 +192,7 @@ export default function AdminPage() {
       return;
     }
     try {
-      await api.post('/admin/requests', { title: newReqTitle, description: newReqDesc });
+      await api.post('/admin/requests', { type: 'other', reason: newReqDesc || newReqTitle });
       toast.success('Request submitted');
       setShowNewRequest(false);
       setNewReqTitle('');
@@ -370,7 +370,7 @@ export default function AdminPage() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass-card p-6">
                 <div className="flex items-center justify-between mb-6">
                   <h2 className="text-lg font-bold text-slate-900 dark:text-white">Departments ({departments.length})</h2>
-                  <button onClick={fetchRequests} className="btn-ghost text-sm">
+                  <button onClick={fetchDepartments} className="btn-ghost text-sm">
                     <ArrowPathIcon className="w-4 h-4" /> Refresh
                   </button>
                 </div>

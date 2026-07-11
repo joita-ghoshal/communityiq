@@ -107,4 +107,20 @@ export class AdminService {
       order: { name: 'ASC' },
     });
   }
+
+  async createDepartment(data: { name: string; description?: string }): Promise<Department> {
+    if (!data.name || !data.name.trim()) {
+      throw new BadRequestException('Department name is required');
+    }
+    const existing = await this.departmentRepository.findOne({ where: { name: data.name.trim() } });
+    if (existing) {
+      throw new BadRequestException('Department with this name already exists');
+    }
+    const department = this.departmentRepository.create({
+      name: data.name.trim(),
+      description: data.description || '',
+      isActive: true,
+    });
+    return this.departmentRepository.save(department);
+  }
 }

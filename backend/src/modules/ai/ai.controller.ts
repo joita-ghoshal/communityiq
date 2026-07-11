@@ -26,9 +26,10 @@ export class AiController {
   @Post('verify-image')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify an image against issue description and category using AI Vision' })
-  @ApiBody({ schema: { properties: { imageBase64: { type: 'string' }, description: { type: 'string' }, category: { type: 'string' } } } })
-  async verifyImage(@Body() body: { imageBase64: string; description: string; category: string }) {
-    return this.aiService.verifyImage(body.imageBase64, body.description, body.category);
+  @ApiBody({ schema: { properties: { imageBase64: { type: 'string' }, image: { type: 'string' }, description: { type: 'string' }, category: { type: 'string' } } } })
+  async verifyImage(@Body() body: { imageBase64?: string; image?: string; description?: string; category?: string }) {
+    const imageData = body.imageBase64 || body.image;
+    return this.aiService.verifyImage(imageData, body.description, body.category);
   }
 
   @Post('insights')

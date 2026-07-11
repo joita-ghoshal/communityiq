@@ -21,7 +21,11 @@ export default function GeofenceAlert() {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
+    let cancelled = false;
+    const lastPos = { lat: 0, lng: 0 };
+
     const checkProximity = async (lat: number, lng: number) => {
+      if (cancelled) return;
       try {
         const { data } = await api.get(
           `/emergency/proximity-check?latitude=${lat}&longitude=${lng}&radius=0.5`
@@ -30,27 +34,32 @@ export default function GeofenceAlert() {
         const activeAlerts = Array.isArray(items)
           ? items.filter((a: any) => !dismissedIds.has(a.id || a._id))
           : [];
-        setAlerts(activeAlerts as AlertData[]);
+        if (!cancelled) setAlerts(activeAlerts as AlertData[]);
       } catch {
-        // Silently fail — no alerts to show
+        // Silently fail
       }
     };
 
     if ('geolocation' in navigator) {
       watchIdRef.current = navigator.geolocation.watchPosition(
         (pos) => {
-          const { latitude, longitude } = pos.coords;
-          checkProximity(latitude, longitude);
-          intervalRef.current = setInterval(() => {
-            checkProximity(latitude, longitude);
-          }, 30000);
+          lastPos.lat = pos.coords.latitude;
+          lastPos.lng = pos.coords.longitude;
+          checkProximity(lastPos.lat, lastPos.lng);
         },
         () => {},
         { enableHighAccuracy: true, maximumAge: 10000 }
       );
     }
 
+    intervalRef.current = setInterval(() => {
+      if (lastPos.lat && lastPos.lng) {
+        checkProximity(lastPos.lat, lastPos.lng);
+      }
+    }, 30000);
+
     return () => {
+      cancelled = true;
       if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
       if (intervalRef.current !== null) clearInterval(intervalRef.current);
     };

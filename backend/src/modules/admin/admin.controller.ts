@@ -94,6 +94,15 @@ export class AdminController {
     return this.adminService.deleteUser(id);
   }
 
+  @Post('departments')
+  @Roles(UserRole.SUPER_ADMIN)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create a new department' })
+  @ApiBody({ schema: { properties: { name: { type: 'string' }, description: { type: 'string' } } } })
+  async createDepartment(@Body() body: { name: string; description?: string }) {
+    return this.adminService.createDepartment(body);
+  }
+
   @Get('departments')
   @Roles(UserRole.SUPER_ADMIN)
   @ApiOperation({ summary: 'Get all departments' })
@@ -104,12 +113,18 @@ export class AdminController {
   @Post('requests')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create a leave/duty transfer request' })
-  @ApiBody({ schema: { properties: { type: { type: 'string' }, reason: { type: 'string' }, startDate: { type: 'string' }, endDate: { type: 'string' } } } })
+  @ApiBody({ schema: { properties: { type: { type: 'string' }, reason: { type: 'string' }, title: { type: 'string' }, description: { type: 'string' }, startDate: { type: 'string' }, endDate: { type: 'string' } } } })
   async createRequest(
     @CurrentUser('id') userId: string,
-    @Body() body: { type: string; reason: string; startDate?: string; endDate?: string },
+    @Body() body: { type?: string; reason?: string; title?: string; description?: string; startDate?: string; endDate?: string },
   ) {
-    return this.leaveRequestService.createRequest(userId, body);
+    const requestData = {
+      type: body.type || 'other',
+      reason: body.reason || body.description || body.title || '',
+      startDate: body.startDate,
+      endDate: body.endDate,
+    };
+    return this.leaveRequestService.createRequest(userId, requestData);
   }
 
   @Get('requests/mine')

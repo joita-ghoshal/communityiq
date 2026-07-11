@@ -6,16 +6,21 @@ import {
   PencilSquareIcon, CameraIcon, CheckBadgeIcon, ShieldCheckIcon,
   MapPinIcon, TrophyIcon, StarIcon, KeyIcon, ChevronDownIcon,
   ChevronUpIcon, CheckCircleIcon, ExclamationCircleIcon,
+  ArrowRightStartOnRectangleIcon,
 } from '@heroicons/react/24/outline';
 import AppShell from '@/components/layout/AppShell';
 import { pageThemes } from '@/lib/theme/page-themes';
 import { useAuth } from '@/hooks/useAuth';
+import { useAuthStore } from '@/stores/auth.store';
+import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 
 export default function ProfilePage() {
   const theme = pageThemes.profile;
   const { user, isLoading } = useAuth();
+  const { logout } = useAuthStore();
+  const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
   const [passwordStep, setPasswordStep] = useState(1);
@@ -293,6 +298,17 @@ export default function ProfilePage() {
                     </motion.div>
                   )}
                 </AnimatePresence>
+              </div>
+
+              {/* Logout */}
+              <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <button
+                  onClick={() => { logout(); router.push('/login'); }}
+                  className="flex items-center gap-2 w-full px-4 py-3 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-sm font-medium"
+                >
+                  <ArrowRightStartOnRectangleIcon className="w-5 h-5" />
+                  Sign Out
+                </button>
               </div>
             </motion.div>
 

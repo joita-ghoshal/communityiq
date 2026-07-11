@@ -114,7 +114,7 @@ export default function ReportIssuePage() {
         reader.onload = async () => {
           const base64 = (reader.result as string).split(',')[1];
           try {
-            const res = await api.post('/ai/verify-image', { image: base64 });
+            const res = await api.post('/ai/verify-image', { imageBase64: base64 });
             const v = res.data?.data || res.data;
             setVerification({ passed: v?.passed !== false, confidence: v?.confidence || 0, message: v?.message || '' });
           } catch {
