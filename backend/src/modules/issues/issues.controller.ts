@@ -185,9 +185,11 @@ export class IssuesController {
     @Param('id') id: string,
     @Body('status') status: IssueStatus,
     @CurrentUser('id') userId: string,
-    @CurrentUser('name') userName?: string,
+    @CurrentUser('firstName') firstName?: string,
+    @CurrentUser('lastName') lastName?: string,
     @CurrentUser('role') userRole?: string,
   ) {
+    const userName = [firstName, lastName].filter(Boolean).join(' ');
     return this.lifecycleService.transitionStatus(id, status, userId, userName, userRole);
   }
 
