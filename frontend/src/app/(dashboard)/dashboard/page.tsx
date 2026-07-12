@@ -12,6 +12,7 @@ import {
 import Link from 'next/link';
 import api from '@/lib/api';
 import AppShell from '@/components/layout/AppShell';
+import { useAuthStore } from '@/stores/auth.store';
 
 const STATUS_COLORS: Record<string, string> = {
   reported: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
@@ -74,6 +75,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [apiHealthy, setApiHealthy] = useState(true);
+  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -108,10 +110,14 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
+    if (authLoading || !isAuthenticated) {
+      setLoading(false);
+      return;
+    }
     fetchDashboard();
     const interval = setInterval(fetchDashboard, 30000);
     return () => clearInterval(interval);
-  }, [fetchDashboard]);
+  }, [fetchDashboard, authLoading, isAuthenticated]);
 
   const userName = typeof window !== 'undefined' ? localStorage.getItem('user_name') || 'Commander' : 'Commander';
   const userRole = typeof window !== 'undefined' ? localStorage.getItem('user_role') || 'Admin' : 'Admin';

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuthStore } from "@/stores/auth.store";
 import { useTranslation } from "react-i18next";
 import {
   Bell,
@@ -36,7 +36,7 @@ interface HeaderProps {
 }
 
 export default function Header({ onToggleMobileMenu, showBackButton }: HeaderProps) {
-  const { user } = useAuth();
+  const { user } = useAuthStore();
   const { t, i18n } = useTranslation();
   const { theme, setTheme } = useTheme();
 

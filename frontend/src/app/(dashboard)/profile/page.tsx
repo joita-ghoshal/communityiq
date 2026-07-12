@@ -10,7 +10,6 @@ import {
 } from '@heroicons/react/24/outline';
 import AppShell from '@/components/layout/AppShell';
 import { pageThemes } from '@/lib/theme/page-themes';
-import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/auth.store';
 import { useRouter } from 'next/navigation';
 import api from '@/lib/api';
@@ -18,7 +17,7 @@ import toast from 'react-hot-toast';
 
 export default function ProfilePage() {
   const theme = pageThemes.profile;
-  const { user, isLoading } = useAuth();
+  const { user, isLoading } = useAuthStore();
   const { logout } = useAuthStore();
   const router = useRouter();
   const [editing, setEditing] = useState(false);
