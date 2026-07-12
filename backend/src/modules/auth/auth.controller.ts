@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Body,
+  Query,
   HttpCode,
   HttpStatus,
   UseGuards,
@@ -84,7 +85,7 @@ export class AuthController {
   @Get('verify-email')
   @ApiOperation({ summary: 'Verify email address' })
   @ApiResponse({ status: 200, description: 'Email verified' })
-  async verifyEmail(@Body('token') token: string) {
+  async verifyEmail(@Query('token') token: string) {
     return this.authService.verifyEmail(token);
   }
 

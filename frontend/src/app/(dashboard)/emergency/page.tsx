@@ -105,7 +105,8 @@ export default function EmergencyPage() {
     try {
       setLoading(true);
       const { data } = await api.get('/emergency/alerts/active');
-      setAlerts(Array.isArray(data) ? data : []);
+      const raw = data?.data || data;
+      setAlerts(Array.isArray(raw) ? raw : []);
       setSystemStatus('operational');
     } catch {
       setAlerts([]);

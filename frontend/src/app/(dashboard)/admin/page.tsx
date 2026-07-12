@@ -126,7 +126,7 @@ const ROLES = [
 
 const PRIORITY_OPTIONS = ['low', 'medium', 'high', 'critical'];
 const STATUS_OPTIONS = ['open', 'in_progress', 'resolved', 'closed'];
-const CATEGORY_OPTIONS = ['infrastructure', 'safety', 'environment', 'utilities', 'other'];
+const CATEGORY_OPTIONS = ['road_damage', 'water_supply', 'sanitation', 'electricity', 'garbage', 'drainage', 'street_lighting', 'public_safety', 'noise_pollution', 'air_pollution', 'parks_green', 'traffic', 'building_safety', 'flooding', 'animal_control', 'other'];
 
 function Spinner({ size = 'md' }: { size?: 'sm' | 'md' | 'lg' }) {
   const s = size === 'sm' ? 'h-5 w-5' : size === 'lg' ? 'h-12 w-12' : 'h-8 w-8';
@@ -1155,7 +1155,7 @@ function NotificationsTab() {
     if (!sendTitle.trim() || !sendMessage.trim()) { toast.error('Fill all fields'); return; }
     setSending(true);
     try {
-      await api.post('/notifications', { title: sendTitle, message: sendMessage, type: sendType });
+      await api.post('/notifications', { title: sendTitle, message: sendMessage, type: sendType, broadcast: true });
       toast.success('Notification sent');
       setShowSend(false);
       setSendTitle(''); setSendMessage(''); setSendType('default');
@@ -1502,8 +1502,8 @@ function SettingsTab() {
   useEffect(() => {
     (async () => {
       try {
-        const { data } = await api.get('/analytics/dashboard');
-        const d = data.data || data || {};
+        const { data } = await api.get('/admin/settings');
+        const d = data?.data || data || {};
         setSettings((s) => ({
           ...s,
           platformName: d.platformName || s.platformName,
@@ -1660,7 +1660,7 @@ function EmergencyTab() {
     if (!newTitle.trim() || !newMessage.trim()) { toast.error('Fill all fields'); return; }
     setCreating(true);
     try {
-      await api.post('/emergency/alerts', { title: newTitle, message: newMessage, severity: newSeverity });
+      await api.post('/emergency/alerts', { type: 'public_safety', title: newTitle, description: newMessage, severity: newSeverity });
       toast.success('Emergency alert created');
       setShowCreate(false);
       setNewTitle(''); setNewMessage(''); setNewSeverity('high');
@@ -1721,9 +1721,10 @@ function EmergencyTab() {
                   <input type="text" placeholder="Alert title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} className="input-field !py-2 text-sm flex-1" />
                   <select value={newSeverity} onChange={(e) => setNewSeverity(e.target.value)} className="input-field !py-2 text-sm w-32">
                     <option value="low">Low</option>
-                    <option value="medium">Medium</option>
+                    <option value="moderate">Moderate</option>
                     <option value="high">High</option>
-                    <option value="critical">Critical</option>
+                    <option value="severe">Severe</option>
+                    <option value="extreme">Extreme</option>
                   </select>
                 </div>
                 <textarea placeholder="Alert message..." value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="input-field !py-2 text-sm min-h-[80px] w-full" />

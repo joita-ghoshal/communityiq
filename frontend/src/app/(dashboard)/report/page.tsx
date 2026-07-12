@@ -17,15 +17,20 @@ import { useRouter } from 'next/navigation';
 
 const categories = [
   { value: 'road_damage', label: 'Road Damage' },
-  { value: 'water_leakage', label: 'Water Leakage' },
+  { value: 'water_supply', label: 'Water Supply' },
   { value: 'garbage', label: 'Garbage/Waste' },
   { value: 'electricity', label: 'Electricity' },
   { value: 'drainage', label: 'Drainage' },
-  { value: 'noise', label: 'Noise Pollution' },
+  { value: 'noise_pollution', label: 'Noise Pollution' },
   { value: 'public_safety', label: 'Public Safety' },
   { value: 'street_lighting', label: 'Street Lighting' },
-  { value: 'encroachment', label: 'Encroachment' },
-  { value: 'environmental', label: 'Environmental' },
+  { value: 'sanitation', label: 'Sanitation' },
+  { value: 'air_pollution', label: 'Air Pollution' },
+  { value: 'parks_green', label: 'Parks & Green Spaces' },
+  { value: 'traffic', label: 'Traffic' },
+  { value: 'building_safety', label: 'Building Safety' },
+  { value: 'flooding', label: 'Flooding' },
+  { value: 'animal_control', label: 'Animal Control' },
   { value: 'other', label: 'Other' },
 ];
 
@@ -207,23 +212,23 @@ export default function ReportIssuePage() {
     }
     setSubmitting(true);
     try {
-      const formData = new FormData();
-      formData.append('title', form.title);
-      formData.append('description', form.description);
-      formData.append('category', form.category);
-      formData.append('priority', form.priority);
-      formData.append('address', form.address);
-      formData.append('city', form.city);
-      formData.append('state', form.state);
-      formData.append('pincode', form.pincode);
-      formData.append('ward', form.ward);
-      formData.append('tags', form.tags);
+      const payload: Record<string, any> = {
+        title: form.title,
+        description: form.description,
+        category: form.category,
+        priority: form.priority,
+        address: form.address,
+        city: form.city,
+        state: form.state,
+        pincode: form.pincode,
+        ward: form.ward,
+      };
+      if (form.tags) payload.tags = form.tags.split(',').map((t: string) => t.trim()).filter(Boolean);
       if (coords) {
-        formData.append('latitude', coords[0].toString());
-        formData.append('longitude', coords[1].toString());
+        payload.latitude = coords[0];
+        payload.longitude = coords[1];
       }
-      files.forEach((f) => formData.append('media', f));
-      const res = await api.post('/issues', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      const res = await api.post('/issues', payload);
       const issueId = res.data?.data?.id || res.data?.id || '';
       setSubmittedIssueId(issueId);
       toast.success('Issue reported successfully!');

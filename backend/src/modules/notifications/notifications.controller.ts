@@ -7,13 +7,19 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../../database/entities/user.entity';
 import { NotificationType } from '../../database/entities/notification.entity';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { User } from '../../database/entities/user.entity';
 
 @ApiTags('Notifications')
 @Controller('notifications')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth('access-token')
 export class NotificationsController {
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(
+    private readonly notificationsService: NotificationsService,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Get user notifications' })
@@ -53,8 +59,23 @@ export class NotificationsController {
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({ summary: 'Create and send a notification (admin only)' })
   async createNotification(
-    @Body() body: { userId: string; type?: string; title: string; message: string; data?: Record<string, any> },
+    @Body() body: { userId?: string; broadcast?: boolean; type?: string; title: string; message: string; data?: Record<string, any> },
   ) {
+    if (body.broadcast || !body.userId) {
+      const users = await this.userRepo.find({ where: { isActive: true } });
+      const results = [];
+      for (const user of users) {
+        const r = await this.notificationsService.create({
+          userId: user.id,
+          type: (body.type as NotificationType) || NotificationType.SYSTEM,
+          title: body.title,
+          message: body.message,
+          data: body.data,
+        });
+        results.push(r);
+      }
+      return { message: `Notification sent to ${users.length} users`, count: users.length };
+    }
     return this.notificationsService.create({
       userId: body.userId,
       type: (body.type as NotificationType) || NotificationType.SYSTEM,

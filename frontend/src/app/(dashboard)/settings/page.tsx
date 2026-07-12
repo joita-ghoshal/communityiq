@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from 'react-i18next';
 import i18next from 'i18next';
@@ -17,6 +17,8 @@ import { pageThemes } from '@/lib/theme/page-themes';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import api from '@/lib/api';
+import toast from 'react-hot-toast';
 
 const languages = [
   { code: 'en', label: 'English' },
@@ -40,14 +42,23 @@ export default function SettingsPage() {
   const [selectedLanguage, setSelectedLanguage] = useState(i18next.language || 'en');
 
   const [profile, setProfile] = useState({
-    firstName: 'Priya',
-    lastName: 'Sharma',
-    email: 'priya.sharma@email.com',
-    phone: '+91 98765 43210',
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
   });
   const [editingProfile, setEditingProfile] = useState(false);
   const [profileDraft, setProfileDraft] = useState({ ...profile });
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get('/users/me').then(({ data }) => {
+      const u = data?.data || data;
+      const p = { firstName: u.firstName || '', lastName: u.lastName || '', email: u.email || '', phone: u.phone || '' };
+      setProfile(p);
+      setProfileDraft(p);
+    }).catch(() => {});
+  }, []);
 
   // Notification state
   const [notifications, setNotifications] = useState({
@@ -101,9 +112,15 @@ export default function SettingsPage() {
     { id: 'about', label: 'About', icon: InformationCircleIcon },
   ];
 
-  const handleSaveProfile = () => {
-    setProfile({ ...profileDraft });
-    setEditingProfile(false);
+  const handleSaveProfile = async () => {
+    try {
+      await api.patch('/users/me', { firstName: profileDraft.firstName, lastName: profileDraft.lastName, phone: profileDraft.phone });
+      setProfile({ ...profileDraft });
+      setEditingProfile(false);
+      toast.success('Profile updated');
+    } catch {
+      toast.error('Failed to update profile');
+    }
   };
 
   const handleCancelEdit = () => {
