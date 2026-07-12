@@ -206,9 +206,11 @@ export class IssuesController {
     @Body('estimatedCompletion') estimatedCompletion?: Date,
     @Body('responsibleTeam') responsibleTeam?: string,
     @CurrentUser('id') userId?: string,
-    @CurrentUser('name') userName?: string,
+    @CurrentUser('firstName') firstName?: string,
+    @CurrentUser('lastName') lastName?: string,
     @CurrentUser('role') userRole?: string,
   ) {
+    const userName = [firstName, lastName].filter(Boolean).join(' ');
     return this.lifecycleService.updateProgress(
       id, percentage, pendingWork, completedWork, remainingTasks,
       estimatedCompletion, responsibleTeam, userId, userName, userRole,
@@ -225,9 +227,11 @@ export class IssuesController {
     @Body('afterPhotos') afterPhotos: string[],
     @Body('workNotes') workNotes: string,
     @CurrentUser('id') userId: string,
-    @CurrentUser('name') userName: string,
+    @CurrentUser('firstName') firstName: string,
+    @CurrentUser('lastName') lastName: string,
     @CurrentUser('role') userRole: string,
   ) {
+    const userName = [firstName, lastName].filter(Boolean).join(' ');
     return this.lifecycleService.uploadEvidence(id, userId, userName, userRole, { beforePhotos, afterPhotos, workNotes });
   }
 
@@ -239,8 +243,10 @@ export class IssuesController {
     @Param('id') id: string,
     @Body('confirmed') confirmed: boolean,
     @CurrentUser('id') userId: string,
-    @CurrentUser('name') userName: string,
+    @CurrentUser('firstName') firstName: string,
+    @CurrentUser('lastName') lastName: string,
   ) {
+    const userName = [firstName, lastName].filter(Boolean).join(' ');
     return this.lifecycleService.confirmCitizenResolution(id, confirmed, userId, userName);
   }
 
@@ -252,9 +258,11 @@ export class IssuesController {
     @Param('id') id: string,
     @Body('reason') reason: string,
     @CurrentUser('id') userId: string,
-    @CurrentUser('name') userName?: string,
+    @CurrentUser('firstName') firstName?: string,
+    @CurrentUser('lastName') lastName?: string,
     @CurrentUser('role') userRole?: string,
   ) {
+    const userName = [firstName, lastName].filter(Boolean).join(' ');
     return this.lifecycleService.escalateIssue(id, reason, userId, userName, userRole);
   }
 
