@@ -266,7 +266,7 @@ export default function GovernmentPage() {
     for (const id of selected) {
       if (bulkDept) await handleAssign(id, bulkDept);
       if (bulkPriority) {
-        try { await api.patch(`/issues/${id}/transition`, { priority: bulkPriority }); } catch {}
+        try { await api.patch(`/issues/${id}`, { priority: bulkPriority }); } catch {}
       }
     }
     if (bulkDept || bulkPriority) {

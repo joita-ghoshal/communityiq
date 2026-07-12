@@ -145,6 +145,45 @@ export class AdminController {
     return this.leaveRequestService.getAllRequests();
   }
 
+  @Patch('departments/:id')
+  @Roles(UserRole.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @Audit('department.update', 'department')
+  @ApiOperation({ summary: 'Update a department' })
+  @ApiParam({ name: 'id', type: String })
+  async updateDepartment(
+    @Param('id') id: string,
+    @Body() body: { name?: string; description?: string; headId?: string },
+  ) {
+    return this.adminService.updateDepartment(id, body);
+  }
+
+  @Delete('departments/:id')
+  @Roles(UserRole.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @Audit('department.delete', 'department')
+  @ApiOperation({ summary: 'Deactivate a department' })
+  @ApiParam({ name: 'id', type: String })
+  async deleteDepartment(@Param('id') id: string) {
+    return this.adminService.deleteDepartment(id);
+  }
+
+  @Get('settings')
+  @Roles(UserRole.SUPER_ADMIN)
+  @ApiOperation({ summary: 'Get platform settings' })
+  async getSettings() {
+    return this.adminService.getSettings();
+  }
+
+  @Patch('settings')
+  @Roles(UserRole.SUPER_ADMIN)
+  @HttpCode(HttpStatus.OK)
+  @Audit('settings.update', 'settings')
+  @ApiOperation({ summary: 'Update platform settings' })
+  async updateSettings(@Body() body: Record<string, any>) {
+    return this.adminService.updateSettings(body);
+  }
+
   @Patch('requests/:id/review')
   @Roles(UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)

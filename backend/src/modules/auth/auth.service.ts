@@ -355,6 +355,23 @@ export class AuthService {
     return { message: 'OTP sent to email', otp };
   }
 
+  async verifyOtp(email: string, otp: string) {
+    const stored = this.otpStore.get(email);
+    if (!stored) {
+      throw new BadRequestException('No OTP requested for this email');
+    }
+    if (Date.now() > stored.expiresAt) {
+      this.otpStore.delete(email);
+      throw new BadRequestException('OTP has expired');
+    }
+    const hash = createHash('sha256').update(otp).digest('hex');
+    if (hash !== stored.hash) {
+      throw new BadRequestException('Invalid OTP');
+    }
+    this.otpStore.delete(email);
+    return { message: 'OTP verified successfully', verified: true };
+  }
+
   async verifyOtpAndResetPassword(email: string, otp: string, newPassword: string) {
     const stored = this.otpStore.get(email);
     if (!stored) {

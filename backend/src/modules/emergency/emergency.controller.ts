@@ -51,6 +51,14 @@ export class EmergencyController {
     return this.emergencyService.getActiveAlerts();
   }
 
+  @Get('alerts')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get all emergency alerts (admin)' })
+  async allAlerts() {
+    return this.emergencyService.getAllAlerts();
+  }
+
   @Get('alerts/nearby')
   @ApiOperation({ summary: 'Get alerts near a location (PostGIS)' })
   @ApiQuery({ name: 'lat', type: Number })

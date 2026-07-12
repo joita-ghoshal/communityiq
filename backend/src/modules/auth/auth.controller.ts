@@ -127,6 +127,18 @@ export class AuthController {
     return this.authService.sendOtp(email);
   }
 
+  @Post('verify-otp')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Verify OTP code' })
+  @ApiResponse({ status: 200, description: 'OTP verified' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired OTP' })
+  async verifyOtp(
+    @Body('email') email: string,
+    @Body('otp') otp: string,
+  ) {
+    return this.authService.verifyOtp(email, otp);
+  }
+
   @Post('verify-otp-reset')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Verify OTP and reset password' })

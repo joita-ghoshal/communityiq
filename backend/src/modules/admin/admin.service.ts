@@ -123,4 +123,47 @@ export class AdminService {
     });
     return this.departmentRepository.save(department);
   }
+
+  async updateDepartment(id: string, data: { name?: string; description?: string; headId?: string }): Promise<Department> {
+    const department = await this.departmentRepository.findOne({ where: { id } });
+    if (!department) {
+      throw new NotFoundException(`Department with id ${id} not found`);
+    }
+    if (data.name !== undefined) department.name = data.name;
+    if (data.description !== undefined) department.description = data.description;
+    if (data.headId !== undefined) (department as any).headId = data.headId;
+    return this.departmentRepository.save(department);
+  }
+
+  async deleteDepartment(id: string): Promise<{ message: string; id: string }> {
+    const department = await this.departmentRepository.findOne({ where: { id } });
+    if (!department) {
+      throw new NotFoundException(`Department with id ${id} not found`);
+    }
+    department.isActive = false;
+    await this.departmentRepository.save(department);
+    return { message: 'Department deactivated successfully', id };
+  }
+
+  private platformSettings: Record<string, any> = {
+    maintenanceMode: false,
+    registrationEnabled: true,
+    emailNotifications: true,
+    smsNotifications: false,
+    autoAssignIssues: true,
+    maxIssuesPerUser: 50,
+    issueExpiryDays: 30,
+    defaultPriority: 'medium',
+    aiAnalysisEnabled: true,
+    communityVerificationRequired: true,
+  };
+
+  async getSettings(): Promise<Record<string, any>> {
+    return this.platformSettings;
+  }
+
+  async updateSettings(data: Record<string, any>): Promise<Record<string, any>> {
+    this.platformSettings = { ...this.platformSettings, ...data };
+    return this.platformSettings;
+  }
 }

@@ -1,7 +1,11 @@
-import { Controller, Get, Patch, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Param, Query, Body, UseGuards, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { NotificationsService } from './notifications.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
+import { UserRole } from '../../database/entities/user.entity';
+import { NotificationType } from '../../database/entities/notification.entity';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('Notifications')
@@ -41,5 +45,22 @@ export class NotificationsController {
   @ApiOperation({ summary: 'Get unread notification count' })
   async getUnreadCount(@CurrentUser('id') userId: string) {
     return this.notificationsService.getUnreadCount(userId);
+  }
+
+  @Post()
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.MUNICIPAL_ADMIN)
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({ summary: 'Create and send a notification (admin only)' })
+  async createNotification(
+    @Body() body: { userId: string; type?: string; title: string; message: string; data?: Record<string, any> },
+  ) {
+    return this.notificationsService.create({
+      userId: body.userId,
+      type: (body.type as NotificationType) || NotificationType.SYSTEM,
+      title: body.title,
+      message: body.message,
+      data: body.data,
+    });
   }
 }

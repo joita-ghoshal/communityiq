@@ -71,6 +71,12 @@ export class EmergencyService {
     });
   }
 
+  async getAllAlerts() {
+    return this.alertRepo.find({
+      order: { createdAt: 'DESC' },
+    });
+  }
+
   async getNearbyAlerts(lat: number, lng: number, radiusKm: number) {
     return this.alertRepo
       .createQueryBuilder('alert')
