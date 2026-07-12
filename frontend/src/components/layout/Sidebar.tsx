@@ -22,6 +22,7 @@ import {
   ChevronRight,
   UserCog,
   Sparkles,
+  Building2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/analytics", icon: BarChart3, labelKey: "nav.analytics", roles: ["department_admin", "municipal_admin", "super_admin"] },
   { href: "/heroes", icon: Award, labelKey: "nav.heroes", roles: ["citizen", "volunteer", "department_admin", "municipal_admin", "super_admin"] },
   { href: "/emergency", icon: Flame, labelKey: "nav.emergency", roles: ["citizen", "volunteer", "department_admin", "municipal_admin", "super_admin"] },
+  { href: "/government", icon: Building2, labelKey: "nav.government", roles: ["municipal_admin", "super_admin"] },
   { href: "/settings", icon: Settings, labelKey: "nav.settings", roles: ["citizen", "volunteer", "department_admin", "municipal_admin", "super_admin"] },
   { href: "/ai-assistant", icon: Sparkles, labelKey: "nav.aiAssistant", roles: ["citizen", "volunteer", "department_admin", "municipal_admin", "super_admin"] },
 ];

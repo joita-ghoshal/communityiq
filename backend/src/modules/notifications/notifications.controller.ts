@@ -53,6 +53,21 @@ export class NotificationsController {
     return this.notificationsService.getUnreadCount(userId);
   }
 
+  @Get('all')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.SUPER_ADMIN, UserRole.MUNICIPAL_ADMIN)
+  @ApiOperation({ summary: 'Get all notifications (admin only)' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'unreadOnly', required: false, type: Boolean })
+  async findAllAdmin(
+    @Query('page') page = 1,
+    @Query('limit') limit = 50,
+    @Query('unreadOnly') unreadOnly?: boolean,
+  ) {
+    return this.notificationsService.findAllAdmin(page, limit, unreadOnly);
+  }
+
   @Post()
   @UseGuards(RolesGuard)
   @Roles(UserRole.SUPER_ADMIN, UserRole.MUNICIPAL_ADMIN)

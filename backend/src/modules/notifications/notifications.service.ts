@@ -72,6 +72,26 @@ export class NotificationsService {
     return saved;
   }
 
+  async findAllAdmin(page = 1, limit = 50, unreadOnly?: boolean) {
+    const qb = this.notifRepo.createQueryBuilder('n');
+
+    if (unreadOnly) {
+      qb.andWhere('n.isRead = false');
+    }
+
+    qb.orderBy('n.createdAt', 'DESC');
+
+    const [notifications, total] = await qb
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      data: notifications,
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
   async findAll(userId: string, page = 1, limit = 20, unreadOnly?: boolean) {
     const qb = this.notifRepo.createQueryBuilder('n')
       .where('n.userId = :userId', { userId });

@@ -2,8 +2,9 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { HomeIcon, MapIcon, ExclamationTriangleIcon, FireIcon, UserCircleIcon } from '@heroicons/react/24/outline';
-import { useEmergencyStore } from '@/stores/emergency.store';
 import { cn } from '@/lib/utils';
+import { useState, useEffect } from 'react';
+import api from '@/lib/api';
 
 const items = [
   { href: '/', icon: HomeIcon, label: 'Home' },
@@ -15,7 +16,14 @@ const items = [
 
 export default function MobileNav() {
   const pathname = usePathname();
-  const { emergencyActive } = useEmergencyStore();
+  const [emergencyActive, setEmergencyActive] = useState(false);
+
+  useEffect(() => {
+    api.get('/emergency/alerts/active').then(({ data }) => {
+      const raw = data?.data || data;
+      setEmergencyActive(Array.isArray(raw) && raw.length > 0);
+    }).catch(() => {});
+  }, []);
 
   return (
     <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-xl border-t border-slate-200/50 dark:border-slate-700/50 safe-area-pb">

@@ -1,13 +1,23 @@
 'use client';
 import { motion } from 'framer-motion';
 import { ExclamationTriangleIcon, XMarkIcon } from '@heroicons/react/24/outline';
-import { useEmergencyStore } from '@/stores/emergency.store';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import api from '@/lib/api';
+
+interface Alert { id: string; title: string; severity: string; type: string; description?: string; }
 
 export default function EmergencyAlertBanner() {
-  const { activeAlerts } = useEmergencyStore();
+  const [alerts, setAlerts] = useState<Alert[]>([]);
   const [dismissed, setDismissed] = useState(false);
-  if (dismissed || activeAlerts.length === 0) return null;
+
+  useEffect(() => {
+    api.get('/emergency/alerts/active').then(({ data }) => {
+      const raw = data?.data || data;
+      setAlerts(Array.isArray(raw) ? raw : []);
+    }).catch(() => {});
+  }, []);
+
+  if (dismissed || alerts.length === 0) return null;
 
   return (
     <motion.div
@@ -21,7 +31,7 @@ export default function EmergencyAlertBanner() {
         <div className="text-sm font-semibold">
           <span className="animate-pulse">EMERGENCY ALERT</span>
           <span className="ml-2 font-normal opacity-90">
-            {activeAlerts.length} active emergency{activeAlerts.length > 1 ? 's' : ''} — {activeAlerts[0]?.title}
+            {alerts.length} active emergency{alerts.length > 1 ? 's' : ''} — {alerts[0]?.title}
           </span>
         </div>
       </div>

@@ -1140,8 +1140,9 @@ function NotificationsTab() {
     setLoading(true);
     setError(null);
     try {
-      const { data } = await api.get('/notifications');
-      setNotifications(data.data?.notifications || data.notifications || data.data || data || []);
+      const { data } = await api.get('/notifications/all');
+      const raw = data?.data || data;
+      setNotifications(raw?.data || raw?.notifications || raw || []);
     } catch {
       setError('Failed to load notifications');
     } finally {
