@@ -136,11 +136,11 @@ export default function GovernmentPage() {
           api.get('/admin/users'),
         ]);
         if (dashRes.status === 'fulfilled') { const d = dashRes.value.data?.data || dashRes.value.data; setDashboard(d); }
-        if (issuesRes.status === 'fulfilled') { const raw = issuesRes.value.data?.data || issuesRes.value.data; setIssues(Array.isArray(raw) ? raw : []); }
-        if (deptRes.status === 'fulfilled') { const raw = deptRes.value.data?.data || deptRes.value.data; setDepartments(Array.isArray(raw) ? raw : []); }
-        if (kpiRes.status === 'fulfilled') { const raw = kpiRes.value.data?.data || kpiRes.value.data; setKpis(Array.isArray(raw) ? raw : []); }
-        if (deptListRes.status === 'fulfilled') { const raw = deptListRes.value.data?.data || deptListRes.value.data; setAllDepartments(Array.isArray(raw) ? raw : []); }
-        if (usersRes.status === 'fulfilled') { const raw = usersRes.value.data?.data || usersRes.value.data; setUsers(Array.isArray(raw) ? raw : []); }
+        if (issuesRes.status === 'fulfilled') { const raw = issuesRes.value.data?.data?.data || issuesRes.value.data?.data || issuesRes.value.data; setIssues(Array.isArray(raw) ? raw : []); }
+        if (deptRes.status === 'fulfilled') { const raw = deptRes.value.data?.data?.data || deptRes.value.data?.data || deptRes.value.data; setDepartments(Array.isArray(raw) ? raw : []); }
+        if (kpiRes.status === 'fulfilled') { const raw = kpiRes.value.data?.data?.data || kpiRes.value.data?.data || kpiRes.value.data; setKpis(Array.isArray(raw) ? raw : []); }
+        if (deptListRes.status === 'fulfilled') { const raw = deptListRes.value.data?.data?.data || deptListRes.value.data?.data || deptListRes.value.data; setAllDepartments(Array.isArray(raw) ? raw : []); }
+        if (usersRes.status === 'fulfilled') { const raw = usersRes.value.data?.data?.data || usersRes.value.data?.data || usersRes.value.data; setUsers(Array.isArray(raw) ? raw : []); }
       } catch (err) {
         console.error('Failed to load government dashboard', err);
       } finally {

@@ -444,7 +444,8 @@ function UsersTab() {
   const fetchDepartments = useCallback(async () => {
     try {
       const { data } = await api.get('/admin/departments');
-      setDepartments(data.data?.departments || data.departments || data.data || data || []);
+      const raw = data.data?.data || data.data || data || [];
+      setDepartments(Array.isArray(raw) ? raw : []);
     } catch { /* ignore */ }
   }, []);
 
@@ -668,7 +669,8 @@ function DepartmentsTab() {
     setError(null);
     try {
       const { data } = await api.get('/admin/departments');
-      setDepartments(data.data?.departments || data.departments || data.data || data || []);
+      const raw = data.data?.data || data.data || data || [];
+      setDepartments(Array.isArray(raw) ? raw : []);
     } catch {
       setError('Failed to load departments');
     } finally {
@@ -998,7 +1000,8 @@ function IssuesTab() {
       if (priorityFilter) params.priority = priorityFilter;
       if (categoryFilter) params.category = categoryFilter;
       const { data } = await api.get('/admin/requests', { params });
-      setRequests(data.data?.requests || data.requests || data.data || data || []);
+      const raw = data.data?.data || data.data || data || [];
+      setRequests(Array.isArray(raw) ? raw : []);
     } catch {
       setError('Failed to load issues');
     } finally {
@@ -1647,7 +1650,8 @@ function EmergencyTab() {
     setError(null);
     try {
       const { data } = await api.get('/emergency/alerts');
-      setAlerts(data.data?.alerts || data.alerts || data.data || data || []);
+      const raw = data.data?.data || data.data || data || [];
+      setAlerts(Array.isArray(raw) ? raw : []);
     } catch {
       setError('Failed to load alerts');
     } finally {

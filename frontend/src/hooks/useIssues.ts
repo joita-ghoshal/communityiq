@@ -9,7 +9,7 @@ export function useIssues(filters?: Record<string, string>) {
       const params = new URLSearchParams();
       if (filters) Object.entries(filters).forEach(([k, v]) => { if (v) params.set(k, v); });
       const { data } = await api.get(`/issues?${params.toString()}`);
-      return data.data;
+      return data.data?.data || data.data || [];
     },
   });
 }

@@ -7,6 +7,7 @@ import { SocketProvider } from '@/contexts/SocketContext';
 import { Toaster } from 'react-hot-toast';
 import I18nProvider from '@/lib/i18n/provider';
 import AIAgentWrapper from '@/components/ai/AIAgentWrapper';
+import GlobalErrorHandler from '@/components/providers/GlobalErrorHandler';
 
 export const metadata: Metadata = {
   title: 'CommunityIQ — AI-Powered Civic Intelligence Platform',
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <AuthProvider>
               <SocketProvider>
                 <I18nProvider>
+                  <GlobalErrorHandler />
                   {children}
                   <AIAgentWrapper />
                   <Toaster position="top-right" toastOptions={{ duration: 4000, style: { background: '#1e293b', color: '#f8fafc', borderRadius: '12px', padding: '12px 16px', fontSize: '14px' } }} />

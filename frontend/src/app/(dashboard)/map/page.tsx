@@ -337,7 +337,7 @@ export default function MapPage() {
 
         if (issuesRes.status === 'fulfilled') {
           const data = issuesRes.value.data;
-          const raw = data?.data?.issues || data?.data || data?.issues || data || [];
+          const raw = data?.data?.data || data?.data || data || [];
           const list: MapIssue[] = (Array.isArray(raw) ? raw : []).map((item: any) => {
             let lat = 0;
             let lng = 0;

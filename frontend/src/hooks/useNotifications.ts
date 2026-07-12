@@ -8,7 +8,7 @@ export function useNotifications() {
   const { setNotifications } = useNotificationStore();
   const { data } = useQuery({
     queryKey: ['notifications'],
-    queryFn: async () => { const { data } = await api.get('/notifications'); return data.data; },
+    queryFn: async () => { const { data } = await api.get('/notifications'); return data.data?.data || data.data || []; },
     refetchInterval: 30000,
   });
 

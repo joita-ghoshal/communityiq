@@ -89,17 +89,27 @@ export default function DashboardPage() {
         api.get('/emergency/alerts/active'),
       ]);
 
-      const extract = (r: PromiseSettledResult<any>) =>
-        r.status === 'fulfilled' ? (r.value.data?.data ?? r.value.data) : null;
+      const extract = (r: PromiseSettledResult<any>) => {
+        if (r.status !== 'fulfilled') return null;
+        const raw = r.value?.data?.data ?? r.value?.data;
+        return raw;
+      };
+      const extractArray = (r: PromiseSettledResult<any>) => {
+        const raw = extract(r);
+        if (Array.isArray(raw)) return raw;
+        if (raw && typeof raw === 'object' && Array.isArray(raw.data)) return raw.data;
+        if (raw && typeof raw === 'object' && Array.isArray(raw.issues)) return raw.issues;
+        return [];
+      };
 
       setData({
         dashboard: extract(dashRes),
         kpis: extract(kpiRes),
         stats: extract(statsRes),
-        recentIssues: extract(issuesRes)?.issues ?? extract(issuesRes) ?? [],
-        notifications: extract(notifRes)?.notifications ?? extract(notifRes) ?? [],
-        unreadCount: extract(unreadRes)?.count ?? extract(unreadRes) ?? 0,
-        emergencies: extract(emergRes)?.alerts ?? extract(emergRes) ?? [],
+        recentIssues: extractArray(issuesRes),
+        notifications: extractArray(notifRes),
+        unreadCount: (() => { const raw = extract(unreadRes); return typeof raw === 'number' ? raw : (raw?.unreadCount ?? raw?.count ?? 0); })(),
+        emergencies: extractArray(emergRes),
       });
       setApiHealthy(true);
     } catch {
