@@ -365,7 +365,7 @@ export default function MapPage() {
               lng,
               address: item.address,
               city: item.city,
-              reporter: item.reporter ?? item.reportedBy,
+              reporter: typeof item.reportedBy === 'object' ? (item.reportedBy?.name ?? item.reportedBy?.email ?? '') : (item.reporter ?? item.reportedBy ?? ''),
               createdAt: item.createdAt,
               completionPercentage: item.completionPercentage ?? item.completion_percentage ?? 0,
               riskScore: item.riskScore ?? item.risk_score ?? 0,

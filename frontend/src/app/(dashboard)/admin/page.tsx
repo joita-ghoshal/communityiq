@@ -448,7 +448,7 @@ function UsersTab() {
     } catch { /* ignore */ }
   }, []);
 
-  useEffect(() => { fetchUsers(1); fetchDepartments(); }, []);
+  useEffect(() => { fetchDepartments(); }, []);
   useEffect(() => { fetchUsers(page, roleFilter); }, [page, roleFilter]);
 
   const handleUpdateRole = async (userId: string) => {

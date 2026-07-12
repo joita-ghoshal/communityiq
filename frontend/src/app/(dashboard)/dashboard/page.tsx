@@ -150,7 +150,7 @@ export default function DashboardPage() {
   }));
 
   const predictedResolution = k.avgResolutionDays ?? d.avgResolutionDays ?? 3;
-  const duplicateRisk = s.total ? Math.min(Math.round((1 - (s.resolved / s.total)) * 100), 95) : 0;
+  const duplicateRisk = s.total ? Math.min(Math.round((1 - ((s.resolved ?? 0) / s.total)) * 100), 95) : 0;
   const avgRisk = k.avgRiskScore ?? 0;
 
   return (

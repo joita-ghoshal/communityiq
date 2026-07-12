@@ -135,12 +135,12 @@ export default function GovernmentPage() {
           api.get('/admin/departments'),
           api.get('/admin/users'),
         ]);
-        if (dashRes.status === 'fulfilled') setDashboard(dashRes.value.data);
-        if (issuesRes.status === 'fulfilled') setIssues(Array.isArray(issuesRes.value.data) ? issuesRes.value.data : []);
-        if (deptRes.status === 'fulfilled') setDepartments(Array.isArray(deptRes.value.data) ? deptRes.value.data : []);
-        if (kpiRes.status === 'fulfilled') setKpis(Array.isArray(kpiRes.value.data) ? kpiRes.value.data : []);
-        if (deptListRes.status === 'fulfilled') setAllDepartments(Array.isArray(deptListRes.value.data) ? deptListRes.value.data : []);
-        if (usersRes.status === 'fulfilled') setUsers(Array.isArray(usersRes.value.data) ? usersRes.value.data : []);
+        if (dashRes.status === 'fulfilled') { const d = dashRes.value.data?.data || dashRes.value.data; setDashboard(d); }
+        if (issuesRes.status === 'fulfilled') { const raw = issuesRes.value.data?.data || issuesRes.value.data; setIssues(Array.isArray(raw) ? raw : []); }
+        if (deptRes.status === 'fulfilled') { const raw = deptRes.value.data?.data || deptRes.value.data; setDepartments(Array.isArray(raw) ? raw : []); }
+        if (kpiRes.status === 'fulfilled') { const raw = kpiRes.value.data?.data || kpiRes.value.data; setKpis(Array.isArray(raw) ? raw : []); }
+        if (deptListRes.status === 'fulfilled') { const raw = deptListRes.value.data?.data || deptListRes.value.data; setAllDepartments(Array.isArray(raw) ? raw : []); }
+        if (usersRes.status === 'fulfilled') { const raw = usersRes.value.data?.data || usersRes.value.data; setUsers(Array.isArray(raw) ? raw : []); }
       } catch (err) {
         console.error('Failed to load government dashboard', err);
       } finally {
@@ -225,7 +225,8 @@ export default function GovernmentPage() {
     setTimelineLoading(true);
     try {
       const res = await api.get(`/issues/${issueId}/timeline`);
-      setRowTimeline(Array.isArray(res.data) ? res.data : []);
+      const raw = res.data?.data || res.data;
+      setRowTimeline(Array.isArray(raw) ? raw : []);
     } catch {
       setRowTimeline([]);
     } finally {
