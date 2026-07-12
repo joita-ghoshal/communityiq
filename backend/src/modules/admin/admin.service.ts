@@ -116,8 +116,10 @@ export class AdminService {
     if (existing) {
       throw new BadRequestException('Department with this name already exists');
     }
+    const code = data.name.trim().toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10) + '-' + Date.now().toString(36).toUpperCase();
     const department = this.departmentRepository.create({
       name: data.name.trim(),
+      code,
       description: data.description || '',
       isActive: true,
     });
