@@ -26,6 +26,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { UserRole } from '../../database/entities/user.entity';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { Audit } from '../audit/audit.decorator';
 
 @ApiTags('Admin')
 @Controller('admin')
@@ -62,6 +63,7 @@ export class AdminController {
   @Patch('users/:id/role')
   @Roles(UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
+  @Audit('user.update_role', 'user')
   @ApiOperation({ summary: 'Update user role' })
   @ApiParam({ name: 'id', type: String })
   @ApiBody({ schema: { properties: { role: { type: 'string', enum: Object.values(UserRole) } } } })
@@ -75,6 +77,7 @@ export class AdminController {
   @Patch('users/:id/department')
   @Roles(UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
+  @Audit('user.update_department', 'user')
   @ApiOperation({ summary: 'Assign user to a department' })
   @ApiParam({ name: 'id', type: String })
   @ApiBody({ schema: { properties: { departmentId: { type: 'string' } } } })
@@ -88,6 +91,7 @@ export class AdminController {
   @Delete('users/:id')
   @Roles(UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
+  @Audit('user.delete', 'user')
   @ApiOperation({ summary: 'Deactivate (soft delete) a user' })
   @ApiParam({ name: 'id', type: String })
   async deleteUser(@Param('id') id: string) {
@@ -97,6 +101,7 @@ export class AdminController {
   @Post('departments')
   @Roles(UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.CREATED)
+  @Audit('department.create', 'department')
   @ApiOperation({ summary: 'Create a new department' })
   @ApiBody({ schema: { properties: { name: { type: 'string' }, description: { type: 'string' } } } })
   async createDepartment(@Body() body: { name: string; description?: string }) {
@@ -143,6 +148,7 @@ export class AdminController {
   @Patch('requests/:id/review')
   @Roles(UserRole.SUPER_ADMIN)
   @HttpCode(HttpStatus.OK)
+  @Audit('request.review', 'request')
   @ApiOperation({ summary: 'Approve or reject a leave request' })
   @ApiParam({ name: 'id', type: String })
   @ApiBody({ schema: { properties: { status: { type: 'string', enum: ['approved', 'rejected'] }, reviewNote: { type: 'string' } } } })
