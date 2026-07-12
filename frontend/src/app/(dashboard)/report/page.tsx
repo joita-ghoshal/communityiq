@@ -8,12 +8,12 @@ import {
   MapPinIcon, SparklesIcon, PaperAirplaneIcon, XMarkIcon,
   CheckCircleIcon, ArrowLeftIcon, ArrowRightIcon,
 } from '@heroicons/react/24/outline';
-import AppShell from '@/components/layout/AppShell';
 import { pageThemes } from '@/lib/theme/page-themes';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { getCategoryIcon } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
+import { useRouter } from 'next/navigation';
 
 const categories = [
   { value: 'road_damage', label: 'Road Damage' },
@@ -57,6 +57,7 @@ interface VerificationResult {
 
 export default function ReportIssuePage() {
   const theme = pageThemes.report;
+  const router = useRouter();
   const { latitude, longitude } = useGeolocation();
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
@@ -84,10 +85,7 @@ export default function ReportIssuePage() {
   }, [latitude, longitude, geoDetected]);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    setFiles((prev) => {
-      const updated = [...prev, ...acceptedFiles].slice(0, 5);
-      return updated;
-    });
+    setFiles((prev) => [...prev, ...acceptedFiles].slice(0, 5));
     setVerification(null);
     setVerificationError(false);
   }, []);
@@ -116,7 +114,7 @@ export default function ReportIssuePage() {
           try {
             const res = await api.post('/ai/verify-image', { imageBase64: base64 });
             const v = res.data?.data || res.data;
-            setVerification({ passed: v?.passed !== false, confidence: v?.confidence || 0, message: v?.message || '' });
+            setVerification({ passed: v?.verified !== false && v?.passed !== false, confidence: v?.confidence || 0, message: v?.analysis || '' });
           } catch {
             setVerificationError(true);
             setVerification({ passed: true, confidence: 0, message: 'AI verification unavailable' });
@@ -143,26 +141,23 @@ export default function ReportIssuePage() {
       if (!form.city.trim()) errors.push('City is required');
       if (!form.state.trim()) errors.push('State is required');
     } else if (s === 3) {
-      if (files.length === 0) errors.push('Please upload at least one photo or video as evidence');
+      if (files.length === 0) errors.push('Please upload at least one photo or video');
     }
     setStepErrors(errors);
     if (errors.length > 0) {
-      const message = errors[0];
-      toast.error(message, { id: 'step-error' });
+      toast.error(errors[0], { id: 'step-error' });
       return false;
     }
     return true;
   };
 
   const handleNext = () => {
-    if (validateStep(step)) {
-      setStep(prev => prev + 1);
-    }
+    if (validateStep(step)) setStep(prev => prev + 1);
   };
 
   const detectLocation = () => {
     if (!('geolocation' in navigator)) {
-      toast.error('Geolocation is not supported by your browser');
+      toast.error('Geolocation not supported');
       return;
     }
     setGeoDetecting(true);
@@ -177,7 +172,7 @@ export default function ReportIssuePage() {
           const addr = data.address || {};
           setForm(prev => ({
             ...prev,
-            address: addr.road || addr.suburb || addr.road || addr.display_name?.split(',')[0] || '',
+            address: addr.road || addr.suburb || addr.display_name?.split(',')[0] || '',
             city: addr.city || addr.town || addr.village || addr.county || '',
             state: addr.state || '',
             pincode: addr.postcode || '',
@@ -185,15 +180,12 @@ export default function ReportIssuePage() {
           setGeoDetected(true);
           toast.success('Location detected!');
         } catch {
-          toast.error('Could not reverse geocode your location, please fill manually.');
+          toast.error('Could not reverse geocode, fill manually.');
         } finally {
           setGeoDetecting(false);
         }
       },
-      () => {
-        toast.error('Could not detect location. Please check your GPS settings.');
-        setGeoDetecting(false);
-      },
+      () => { toast.error('GPS access denied. Check settings.'); setGeoDetecting(false); },
       { enableHighAccuracy: true, timeout: 10000 }
     );
   };
@@ -217,82 +209,98 @@ export default function ReportIssuePage() {
         formData.append('longitude', coords[1].toString());
       }
       files.forEach((f) => formData.append('media', f));
-
       await api.post('/issues', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       toast.success('Issue reported successfully!');
       setSubmitted(true);
     } catch (err: any) {
-      const msg = err?.response?.data?.message || 'Failed to submit report. Please try again.';
-      toast.error(msg);
+      toast.error(err?.response?.data?.message || 'Failed to submit. Try again.');
     } finally {
       setSubmitting(false);
     }
   };
 
+  const stepLabels = ['Details', 'Location', 'Media', 'Review'];
+
   if (submitted) {
     return (
-      <AppShell>
-        <div className={`${theme.background} min-h-full flex items-center justify-center p-4`}>
-          <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="glass-card-strong p-12 text-center max-w-md">
-            <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <CheckCircleIcon className="w-10 h-10 text-green-600" />
-            </div>
-            <h2 className="text-2xl font-bold font-heading text-slate-900 dark:text-white mb-2">Issue Reported!</h2>
-            <p className="text-slate-500 mb-6">Your report has been submitted. Our AI is analyzing it now. You&apos;ll be notified when the status changes.</p>
-            <div className="flex gap-3 justify-center">
-              <button onClick={() => { setSubmitted(false); setForm({ title: '', description: '', category: '', priority: 'medium', address: '', city: '', state: '', pincode: '' }); setFiles([]); setStep(1); setVerification(null); setVerificationError(false); setCoords(null); setGeoDetected(false); }} className="btn-primary bg-gradient-to-r from-green-600 to-emerald-600">Report Another</button>
-              <button onClick={() => window.location.href = '/dashboard'} className="btn-secondary border-slate-300 text-slate-700">Go to Dashboard</button>
-            </div>
-          </motion.div>
-        </div>
-      </AppShell>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white dark:bg-slate-900 rounded-3xl p-12 text-center max-w-md shadow-2xl">
+          <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <CheckCircleIcon className="w-10 h-10 text-green-600" />
+          </div>
+          <h2 className="text-2xl font-bold font-heading text-slate-900 dark:text-white mb-2">Issue Reported!</h2>
+          <p className="text-slate-500 mb-6">Your report has been submitted. Our AI is analyzing it now.</p>
+          <div className="flex gap-3 justify-center">
+            <button onClick={() => { setSubmitted(false); setForm({ title: '', description: '', category: '', priority: 'medium', address: '', city: '', state: '', pincode: '' }); setFiles([]); setStep(1); setVerification(null); setVerificationError(false); setCoords(null); setGeoDetected(false); }} className="px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-xl font-medium text-sm hover:shadow-lg transition-all">
+              Report Another
+            </button>
+            <button onClick={() => router.push('/')} className="px-5 py-2.5 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-xl font-medium text-sm hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
+              Go to Dashboard
+            </button>
+          </div>
+        </motion.div>
+      </div>
     );
   }
 
   return (
-    <AppShell>
-      <div className={`${theme.background} min-h-full`}>
-        <div className="max-w-3xl mx-auto p-4 md:p-6 lg:p-8">
-          {/* Header */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
-            <div className={`${theme.gradient} rounded-2xl p-6 text-white relative overflow-hidden`}>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                  <ExclamationTriangleIcon className="w-6 h-6" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold font-heading">Report an Issue</h1>
-                  <p className="text-white/80 text-sm">Help improve your community by reporting civic issues</p>
-                </div>
-              </div>
-            </div>
-          </motion.div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="bg-white dark:bg-slate-900 rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto relative"
+      >
+        {/* Close Button */}
+        <button
+          onClick={() => router.back()}
+          className="absolute top-4 right-4 z-10 p-2 rounded-xl bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+        >
+          <XMarkIcon className="w-5 h-5 text-slate-500" />
+        </button>
 
+        {/* Header */}
+        <div className={`${theme.gradient} rounded-t-3xl p-6 text-white relative overflow-hidden`}>
+          <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGNpcmNsZSBjeD0iMjAiIGN5PSIyMCIgcj0iMSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjA1KSIvPjwvc3ZnPg==')] opacity-50" />
+          <div className="relative z-10 flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center backdrop-blur-sm">
+              <ExclamationTriangleIcon className="w-6 h-6" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold font-heading">Report an Issue</h1>
+              <p className="text-white/80 text-sm">Help improve your community</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-6">
           {/* Step Indicator */}
-          <div className="flex items-center justify-center gap-2 mb-8">
-            {['Details', 'Location', 'Media', 'Review'].map((s, i) => (
-              <div key={s} className="flex items-center gap-2">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${step > i + 1 ? 'bg-green-500 text-white' : step === i + 1 ? `${theme.gradient} text-white shadow-lg` : 'bg-slate-200 dark:bg-slate-700 text-slate-500'}`}>
+          <div className="flex items-center justify-center gap-1 sm:gap-2 mb-8">
+            {stepLabels.map((label, i) => (
+              <div key={label} className="flex items-center gap-1 sm:gap-2">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold transition-all ${
+                  step > i + 1 ? 'bg-green-500 text-white' : step === i + 1 ? `${theme.gradient} text-white shadow-lg` : 'bg-slate-200 dark:bg-slate-700 text-slate-500'
+                }`}>
                   {step > i + 1 ? <CheckCircleIcon className="w-4 h-4" /> : i + 1}
                 </div>
-                <span className={`text-xs font-medium hidden sm:block ${step === i + 1 ? 'text-slate-900 dark:text-white' : 'text-slate-400'}`}>{s}</span>
-                {i < 3 && <div className={`w-8 h-0.5 ${step > i + 1 ? 'bg-green-500' : 'bg-slate-200 dark:bg-slate-700'}`} />}
+                <span className={`text-xs font-medium hidden sm:block ${step === i + 1 ? 'text-slate-900 dark:text-white' : 'text-slate-400'}`}>{label}</span>
+                {i < 3 && <div className={`w-6 sm:w-8 h-0.5 ${step > i + 1 ? 'bg-green-500' : 'bg-slate-200 dark:bg-slate-700'}`} />}
               </div>
             ))}
           </div>
 
           <form onSubmit={handleSubmit}>
             <AnimatePresence mode="wait">
-              {/* Step 1: Details */}
+              {/* Step 1: Issue Details */}
               {step === 1 && (
-                <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="glass-card-strong p-6 space-y-5">
+                <motion.div key="step1" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-5">
                   <h3 className="text-lg font-bold font-heading text-slate-900 dark:text-white">Issue Details</h3>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Title</label>
-                    <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Brief description of the issue" className="input-field" />
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Title *</label>
+                    <input type="text" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Brief description of the issue" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Category</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Category *</label>
                     <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                       {categories.map((cat) => (
                         <button key={cat.value} type="button" onClick={() => setForm({ ...form, category: cat.value })}
@@ -304,11 +312,11 @@ export default function ReportIssuePage() {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Description</label>
-                    <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Describe the issue in detail..." rows={4} className="input-field resize-none" />
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Description *</label>
+                    <textarea value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Describe the issue in detail..." rows={4} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none transition-all text-sm" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Priority</label>
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Priority *</label>
                     <div className="flex gap-2">
                       {priorities.map((p) => (
                         <button key={p.value} type="button" onClick={() => setForm({ ...form, priority: p.value })}
@@ -323,50 +331,43 @@ export default function ReportIssuePage() {
 
               {/* Step 2: Location */}
               {step === 2 && (
-                <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="glass-card-strong p-6 space-y-5">
+                <motion.div key="step2" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-5">
                   <h3 className="text-lg font-bold font-heading text-slate-900 dark:text-white">Location</h3>
-
-                  {/* Auto-locate button */}
                   {!coords && (
                     <button type="button" onClick={detectLocation} disabled={geoDetecting} className="w-full py-3 bg-blue-50 dark:bg-blue-900/20 border-2 border-dashed border-blue-300 dark:border-blue-700 rounded-xl text-sm font-medium text-blue-700 dark:text-blue-300 flex items-center justify-center gap-2 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors">
                       <MapPinIcon className="w-5 h-5" />
-                      {geoDetecting ? 'Detecting your location...' : 'Click to detect my location'}
+                      {geoDetecting ? 'Detecting...' : 'Use Current Location'}
                     </button>
                   )}
-
                   {coords && (
                     <div className="bg-green-50 dark:bg-green-900/20 rounded-xl p-3 flex items-center gap-2 text-sm text-green-700 dark:text-green-400">
                       <MapPinIcon className="w-4 h-4" />
                       GPS detected: {coords[0].toFixed(6)}, {coords[1].toFixed(6)}
                     </div>
                   )}
-
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Address</label>
-                    <input type="text" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Street address or landmark" className="input-field" />
+                    <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">Address *</label>
+                    <input type="text" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} placeholder="Street address or landmark" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">City</label>
-                      <input type="text" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="City" className="input-field" />
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">City *</label>
+                      <input type="text" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} placeholder="City" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm" />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">State</label>
-                      <input type="text" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} placeholder="State" className="input-field" />
+                      <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1.5">State *</label>
+                      <input type="text" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} placeholder="State" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all text-sm" />
                     </div>
                   </div>
-
-                  {/* Leaflet Map Preview */}
                   {coords && (
                     <div className="w-full h-48 rounded-xl overflow-hidden">
                       <DynamicLocationMap lat={coords[0]} lng={coords[1]} />
                     </div>
                   )}
-
                   {!coords && (
-                    <div className="w-full h-48 rounded-xl bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500">
+                    <div className="w-full h-48 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400">
                       <div className="text-center">
-                        <MapPinIcon className="w-8 h-8 mx-auto mb-2 text-slate-400" />
+                        <MapPinIcon className="w-8 h-8 mx-auto mb-2" />
                         <p className="text-sm">Detect location to see map preview</p>
                       </div>
                     </div>
@@ -376,7 +377,7 @@ export default function ReportIssuePage() {
 
               {/* Step 3: Media */}
               {step === 3 && (
-                <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="glass-card-strong p-6 space-y-5">
+                <motion.div key="step3" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-5">
                   <h3 className="text-lg font-bold font-heading text-slate-900 dark:text-white">Evidence (Required)</h3>
                   <div {...getRootProps()} className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all ${isDragActive ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-slate-300 dark:border-slate-600 hover:border-blue-400'}`}>
                     <input {...getInputProps()} />
@@ -390,8 +391,6 @@ export default function ReportIssuePage() {
                     </p>
                     <p className="text-xs text-slate-500 mt-1">Images, videos, audio up to 50MB. Max 5 files.</p>
                   </div>
-
-                  {/* File listing */}
                   {files.length > 0 && (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                       {files.map((file, i) => (
@@ -405,8 +404,6 @@ export default function ReportIssuePage() {
                       ))}
                     </div>
                   )}
-
-                  {/* AI Verification */}
                   {files.length > 0 && (
                     <div className="rounded-xl p-4 border-2 border-dashed border-blue-300 dark:border-blue-700 space-y-2">
                       <p className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
@@ -421,13 +418,9 @@ export default function ReportIssuePage() {
                       )}
                       {!verifying && verification && (
                         <div className={`flex items-center gap-2 text-sm font-medium ${verification.passed ? 'text-green-600' : 'text-amber-600'}`}>
-                          {verification.passed ? 'Verified' : 'Needs Review'} ✓
+                          {verification.passed ? 'Verified' : 'Needs Review'}
                           {verification.confidence ? <span className="text-slate-400">({(verification.confidence * 100).toFixed(0)}% confidence)</span> : null}
-                          {!verification.passed && <span className="text-amber-600">⚠</span>}
                         </div>
-                      )}
-                      {!verifying && verificationError && (
-                        <div className="text-sm text-slate-500">AI verification unavailable, proceeding without it.</div>
                       )}
                     </div>
                   )}
@@ -436,65 +429,54 @@ export default function ReportIssuePage() {
 
               {/* Step 4: Review */}
               {step === 4 && (
-                <motion.div key="step4" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="glass-card-strong p-6 space-y-5">
+                <motion.div key="step4" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }} transition={{ duration: 0.25 }} className="space-y-5">
                   <h3 className="text-lg font-bold font-heading text-slate-900 dark:text-white">Review & Submit</h3>
                   <div className="space-y-3">
-                    <div className="flex justify-between py-2 border-b border-slate-200/50 dark:border-slate-700/50">
-                      <span className="text-sm text-slate-500">Title</span>
-                      <span className="text-sm font-medium text-slate-900 dark:text-white">{form.title}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b border-slate-200/50 dark:border-slate-700/50">
-                      <span className="text-sm text-slate-500">Category</span>
-                      <span className="text-sm font-medium text-slate-900 dark:text-white">{getCategoryIcon(form.category)} {categories.find(c => c.value === form.category)?.label}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b border-slate-200/50 dark:border-slate-700/50">
-                      <span className="text-sm text-slate-500">Priority</span>
-                      <span className="text-sm font-medium capitalize">{form.priority}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b border-slate-200/50 dark:border-slate-700/50">
-                      <span className="text-sm text-slate-500">Address</span>
-                      <span className="text-sm font-medium text-slate-900 dark:text-white text-right">{form.address}, {form.city}</span>
-                    </div>
-                    <div className="flex justify-between py-2 border-b border-slate-200/50 dark:border-slate-700/50">
-                      <span className="text-sm text-slate-500">Description</span>
-                      <span className="text-sm text-slate-900 dark:text-white text-right max-w-xs">{form.description}</span>
-                    </div>
-                    <div className="flex justify-between py-2">
-                      <span className="text-sm text-slate-500">Files</span>
-                      <span className="text-sm font-medium text-slate-900 dark:text-white">{files.length} file(s)</span>
-                    </div>
+                    {[
+                      { label: 'Title', value: form.title },
+                      { label: 'Category', value: `${getCategoryIcon(form.category)} ${categories.find(c => c.value === form.category)?.label}` },
+                      { label: 'Priority', value: form.priority },
+                      { label: 'Address', value: `${form.address}, ${form.city}` },
+                      { label: 'Description', value: form.description },
+                      { label: 'Files', value: `${files.length} file(s)` },
+                    ].map((item) => (
+                      <div key={item.label} className="flex justify-between py-2 border-b border-slate-200/50 dark:border-slate-700/50">
+                        <span className="text-sm text-slate-500">{item.label}</span>
+                        <span className="text-sm font-medium text-slate-900 dark:text-white text-right max-w-[60%]">{item.value}</span>
+                      </div>
+                    ))}
                   </div>
                   <div className="bg-blue-50 dark:bg-blue-900/20 rounded-xl p-4 flex items-start gap-3">
                     <SparklesIcon className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">AI Analysis</p>
-                      <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-0.5">After submission, our AI will analyze your report for classification, severity assessment, duplicate detection, and department recommendation.</p>
+                      <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-0.5">After submission, our AI will classify, assess severity, detect duplicates, and recommend a department.</p>
                     </div>
                   </div>
                 </motion.div>
               )}
             </AnimatePresence>
 
-            {/* Navigation Buttons */}
-            <div className="flex justify-between mt-6">
+            {/* Navigation */}
+            <div className="flex justify-between mt-8 pt-4 border-t border-slate-100 dark:border-slate-800">
               {step > 1 ? (
-                <button type="button" onClick={() => setStep(step - 1)} className="btn-secondary border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300">
+                <button type="button" onClick={() => setStep(step - 1)} className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
                   <ArrowLeftIcon className="w-4 h-4" /> Back
                 </button>
               ) : <div />}
               {step < 4 ? (
-                <button type="button" onClick={handleNext} className="btn-primary bg-gradient-to-r from-green-600 to-emerald-600">
+                <button type="button" onClick={handleNext} className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 text-white text-sm font-medium hover:shadow-lg transition-all">
                   Next <ArrowRightIcon className="w-4 h-4" />
                 </button>
               ) : (
-                <button type="submit" disabled={submitting} className="btn-primary bg-gradient-to-r from-green-600 to-emerald-600">
+                <button type="submit" disabled={submitting} className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-gradient-to-r from-green-600 to-emerald-600 text-white text-sm font-medium hover:shadow-lg transition-all disabled:opacity-50">
                   {submitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><PaperAirplaneIcon className="w-4 h-4" /> Submit Report</>}
                 </button>
               )}
             </div>
           </form>
         </div>
-      </div>
-    </AppShell>
+      </motion.div>
+    </div>
   );
 }

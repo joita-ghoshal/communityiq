@@ -21,6 +21,7 @@ import {
   Heart,
   ChevronRight,
   UserCog,
+  Sparkles,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -32,6 +33,7 @@ const navItems = [
   { href: "/heroes", icon: Award, labelKey: "nav.heroes", roles: ["citizen", "volunteer", "department_admin", "municipal_admin", "super_admin"] },
   { href: "/emergency", icon: Flame, labelKey: "nav.emergency", roles: ["citizen", "volunteer", "department_admin", "municipal_admin", "super_admin"] },
   { href: "/settings", icon: Settings, labelKey: "nav.settings", roles: ["citizen", "volunteer", "department_admin", "municipal_admin", "super_admin"] },
+  { href: "/ai-assistant", icon: Sparkles, labelKey: "nav.aiAssistant", roles: ["citizen", "volunteer", "department_admin", "municipal_admin", "super_admin"] },
 ];
 
 export default function Sidebar() {

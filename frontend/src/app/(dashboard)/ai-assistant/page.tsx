@@ -4,10 +4,11 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   SparklesIcon, PaperAirplaneIcon, LightBulbIcon, MapPinIcon,
   ExclamationTriangleIcon, ChartBarIcon, ChatBubbleLeftRightIcon,
-  MagnifyingGlassIcon, BellIcon,
+  MagnifyingGlassIcon, BellIcon, ArrowPathIcon,
 } from '@heroicons/react/24/outline';
 import AppShell from '@/components/layout/AppShell';
 import { pageThemes } from '@/lib/theme/page-themes';
+import api from '@/lib/api';
 
 interface Message {
   id: string;
@@ -39,40 +40,65 @@ export default function AIAssistantPage() {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [apiError, setApiError] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, [isTyping]);
+
   const handleSend = async (text?: string) => {
     const content = text || input.trim();
-    if (!content) return;
+    if (!content || isTyping) return;
 
     const userMsg: Message = { id: Date.now().toString(), role: 'user', content, timestamp: new Date() };
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setIsTyping(true);
+    setApiError(false);
 
-    await new Promise((r) => setTimeout(r, 1500));
+    try {
+      const conversationHistory = messages
+        .filter((m) => m.id !== '1')
+        .map((m) => ({ role: m.role, content: m.content }));
 
-    let response = '';
-    const lower = content.toLowerCase();
-    if (lower.includes('nearby') || lower.includes('near me') || lower.includes('location')) {
-      response = "📍 **Nearby Issues (2km radius)**\n\nI found 5 issues near your current location:\n\n1. 🛤️ Broken streetlight - 0.3km away - High Priority\n2. 💧 Water leakage - 0.8km away - Critical\n3. 🗑️ Garbage accumulation - 1.2km away - Medium\n4. ⚡ Fallen electric wire - 1.5km away - Critical\n5. 🌊 Blocked drain - 1.8km away - Medium\n\nWould you like me to help you report a new issue or view details of any of these?";
-    } else if (lower.includes('priority') || lower.includes('top') || lower.includes('important')) {
-      response = "📊 **Top Priority Issues Today**\n\nBased on AI severity analysis and community impact scoring:\n\n🔴 **Critical (3)**\n- Gas leak detected on Industrial Area Road\n- Building wall crack in Ward 12\n- Flooding risk near River Bridge\n\n🟠 **High (7)**\n- Multiple potholes on Highway 45\n- Street light outage in Sector 14\n- Water main break on Park Street\n\nThe AI recommends immediate dispatch for the 3 critical issues. Would you like me to escalate these?";
-    } else if (lower.includes('emergency') || lower.includes('alert')) {
-      response = "🚨 **Active Emergency Alerts**\n\nThere are 2 active emergency alerts in your area:\n\n⚠️ **Flood Warning** - Ward 14 & 15\nSeverity: HIGH | Updated 30 min ago\nEvacuation recommended for low-lying areas\n\n⚠️ **Gas Leak Alert** - Industrial Area\nSeverity: CRITICAL | Updated 1 hour ago\nArea has been cordoned. Avoid the area.\n\nI can share live evacuation routes and emergency contacts if needed.";
-    } else if (lower.includes('report')) {
-      response = "📝 **Smart Issue Reporting**\n\nI can help you create an AI-assisted report. Just tell me:\n\n1. What's the issue? (describe it briefly)\n2. Where is it? (address or landmark)\n3. How urgent is it?\n\nOr you can go to the **Report Issue** page for the full form with image/video upload.\n\n💡 Tip: Describing the issue here lets me auto-fill the form and pre-analyze it for you!";
-    } else {
-      response = `I understand you're asking about "${content}". Let me analyze this for you.\n\nBased on my intelligence analysis:\n\n• I've searched across all active issues in the database\n• Cross-referenced with community reports\n• Applied AI classification and impact scoring\n\nCould you be more specific? I can help with:\n- 📍 Finding issues by location\n- 📊 Community analytics\n- 🚨 Emergency information\n- 📝 Issue reporting\n- 🎯 Department recommendations`;
+      const { data } = await api.post('/ai/chat', {
+        message: content,
+        history: conversationHistory,
+      });
+
+      const result = data.data || data;
+      const aiMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: result.response || result.message || 'I received your message but could not generate a response.',
+        timestamp: new Date(),
+        type: 'text',
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+    } catch (err: any) {
+      setApiError(true);
+      const errorMsg = err?.response?.status === 401
+        ? 'Authentication expired. Please refresh the page.'
+        : err?.response?.status >= 500
+          ? 'AI service is temporarily unavailable. Please try again in a moment.'
+          : 'Unable to reach the AI assistant. Please check your connection and try again.';
+      const aiMsg: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: `⚠️ ${errorMsg}\n\nYou can:\n- Try sending your message again\n- Visit the Report Issue page to submit directly\n- Check the Map for nearby issues`,
+        timestamp: new Date(),
+        type: 'alert',
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+    } finally {
+      setIsTyping(false);
     }
-
-    const aiMsg: Message = { id: (Date.now() + 1).toString(), role: 'assistant', content: response, timestamp: new Date(), type: 'text' };
-    setMessages((prev) => [...prev, aiMsg]);
-    setIsTyping(false);
   };
 
   return (
@@ -88,9 +114,13 @@ export default function AIAssistantPage() {
               <h1 className="text-xl font-bold font-heading text-slate-900 dark:text-white">AI Assistant</h1>
               <p className="text-xs text-slate-500">Powered by Civic Intelligence Engine</p>
             </div>
-            <div className="ml-auto flex items-center gap-1.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 px-3 py-1 rounded-full text-xs font-medium">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              Online
+            <div className={`ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+              apiError
+                ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
+            }`}>
+              <div className={`w-2 h-2 rounded-full ${apiError ? 'bg-red-500' : 'bg-emerald-500 animate-pulse'}`} />
+              {apiError ? 'Disconnected' : 'Online'}
             </div>
           </motion.div>
         </div>
@@ -103,7 +133,9 @@ export default function AIAssistantPage() {
                 <div className={`max-w-[80%] md:max-w-[70%] rounded-2xl px-4 py-3 ${
                   msg.role === 'user'
                     ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white'
-                    : 'glass-card-strong'
+                    : msg.type === 'alert'
+                      ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50'
+                      : 'glass-card-strong'
                 }`}>
                   {msg.role === 'assistant' && (
                     <div className="flex items-center gap-1.5 mb-2">
@@ -111,12 +143,17 @@ export default function AIAssistantPage() {
                       <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400">AI Assistant</span>
                     </div>
                   )}
-                  <div className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content.split('\n').map((line, i) => {
-                    if (line.startsWith('📍') || line.startsWith('📊') || line.startsWith('🚨') || line.startsWith('📝')) {
-                      return <p key={i} className="font-bold mt-2 mb-1">{line}</p>;
-                    }
-                    return <p key={i}>{line}</p>;
-                  })}</div>
+                  <div className="text-sm whitespace-pre-wrap leading-relaxed">
+                    {msg.content.split('\n').map((line, i) => {
+                      if (line.startsWith('📍') || line.startsWith('📊') || line.startsWith('🚨') || line.startsWith('📝') || line.startsWith('⚠️')) {
+                        return <p key={i} className="font-bold mt-2 mb-1">{line}</p>;
+                      }
+                      if (line.startsWith('- ')) {
+                        return <p key={i} className="ml-2">{'• '}{line.substring(2)}</p>;
+                      }
+                      return <p key={i}>{line}</p>;
+                    })}
+                  </div>
                   <p className={`text-[10px] mt-2 ${msg.role === 'user' ? 'text-white/60' : 'text-slate-400'}`}>
                     {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </p>
@@ -165,6 +202,7 @@ export default function AIAssistantPage() {
         <div className="p-4 md:px-6 border-t border-slate-200/50 dark:border-slate-700/50 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl">
           <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="flex items-center gap-3">
             <input
+              ref={inputRef}
               type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -174,7 +212,7 @@ export default function AIAssistantPage() {
             />
             <button type="submit" disabled={!input.trim() || isTyping}
               className="w-11 h-11 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center justify-center hover:shadow-lg transition-all disabled:opacity-50 flex-shrink-0">
-              <PaperAirplaneIcon className="w-5 h-5" />
+              {isTyping ? <ArrowPathIcon className="w-5 h-5 animate-spin" /> : <PaperAirplaneIcon className="w-5 h-5" />}
             </button>
           </form>
         </div>

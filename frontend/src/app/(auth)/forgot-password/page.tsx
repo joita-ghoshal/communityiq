@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ShieldCheckIcon, EnvelopeIcon, ArrowLeftIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
+import api from '@/lib/api';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -12,11 +13,17 @@ export default function ForgotPasswordPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim()) {
+      toast.error('Please enter your email');
+      return;
+    }
     setLoading(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await api.post('/auth/forgot-password', { email });
       setSent(true);
       toast.success('Reset link sent to your email');
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to send reset link');
     } finally {
       setLoading(false);
     }

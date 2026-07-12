@@ -31,6 +31,19 @@ export default function ProfilePage() {
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [otpToken, setOtpToken] = useState('');
 
+  const getPasswordStrength = (pw: string): { score: number; label: string; color: string } => {
+    let score = 0;
+    if (pw.length >= 8) score++;
+    if (pw.length >= 12) score++;
+    if (/[A-Z]/.test(pw)) score++;
+    if (/[a-z]/.test(pw)) score++;
+    if (/[0-9]/.test(pw)) score++;
+    if (/[^A-Za-z0-9]/.test(pw)) score++;
+    if (score <= 2) return { score, label: 'Weak', color: 'bg-red-500' };
+    if (score <= 4) return { score, label: 'Medium', color: 'bg-yellow-500' };
+    return { score, label: 'Strong', color: 'bg-green-500' };
+  };
+
   const handleSendOtp = async () => {
     if (!otpEmail) {
       toast.error('Please enter your email');
@@ -266,13 +279,34 @@ export default function ProfilePage() {
 
                         {passwordStep === 3 && (
                           <>
-                            <input
-                              type="password"
-                              placeholder="New password (min 8 characters)"
-                              value={newPassword}
-                              onChange={(e) => setNewPassword(e.target.value)}
-                              className="input-field"
-                            />
+                            <div>
+                              <input
+                                type="password"
+                                placeholder="New password (min 8 characters)"
+                                value={newPassword}
+                                onChange={(e) => setNewPassword(e.target.value)}
+                                className="input-field"
+                              />
+                              {newPassword.length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                  <div className="flex gap-1">
+                                    {[1, 2, 3, 4, 5, 6].map((i) => (
+                                      <div key={i} className={`h-1.5 flex-1 rounded-full transition-all ${
+                                        i <= getPasswordStrength(newPassword).score
+                                          ? getPasswordStrength(newPassword).color
+                                          : 'bg-slate-200 dark:bg-slate-700'
+                                      }`} />
+                                    ))}
+                                  </div>
+                                  <p className={`text-xs font-medium ${
+                                    getPasswordStrength(newPassword).score <= 2 ? 'text-red-500' :
+                                    getPasswordStrength(newPassword).score <= 4 ? 'text-yellow-500' : 'text-green-500'
+                                  }`}>
+                                    {getPasswordStrength(newPassword).label} password
+                                  </p>
+                                </div>
+                              )}
+                            </div>
                             <input
                               type="password"
                               placeholder="Confirm new password"

@@ -40,9 +40,7 @@ export default function StatsCard({ title, value, change, changeLabel, icon: Ico
         <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{title}</p>
         {changeLabel && <p className="text-[10px] text-slate-400 mt-1">{changeLabel}</p>}
       </div>
-      <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800">
-        <p className="text-xs text-blue-600 dark:text-blue-400 font-medium group-hover:underline">View details →</p>
-      </div>
+
     </motion.div>
   );
 
