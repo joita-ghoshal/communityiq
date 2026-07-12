@@ -14,6 +14,7 @@ import { getCategoryIcon } from '@/lib/utils';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import AppShell from '@/components/layout/AppShell';
 
 const categories = [
   { value: 'road_damage', label: 'Road Damage' },
@@ -259,6 +260,7 @@ export default function ReportIssuePage() {
   };
 
   return (
+    <AppShell>
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-4 overflow-y-auto">
       <motion.div
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -753,6 +755,7 @@ export default function ReportIssuePage() {
         )}
       </AnimatePresence>
     </div>
+    </AppShell>
   );
 }
 

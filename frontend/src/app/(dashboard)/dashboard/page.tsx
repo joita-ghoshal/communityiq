@@ -11,6 +11,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Link from 'next/link';
 import api from '@/lib/api';
+import AppShell from '@/components/layout/AppShell';
 
 const STATUS_COLORS: Record<string, string> = {
   reported: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
@@ -154,6 +155,7 @@ export default function DashboardPage() {
   const avgRisk = k.avgRiskScore ?? 0;
 
   return (
+    <AppShell>
     <div className="min-h-full">
       <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
         {/* Back Button */}
@@ -528,5 +530,6 @@ export default function DashboardPage() {
         </div>
       </div>
     </div>
+    </AppShell>
   );
 }
