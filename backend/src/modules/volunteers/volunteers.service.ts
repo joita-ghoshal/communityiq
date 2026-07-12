@@ -116,6 +116,25 @@ export class VolunteersService {
     return { message: 'Badge assigned', badge: newBadge };
   }
 
+  async getStats() {
+    const totalVolunteers = await this.volRepo.count();
+    const activeVolunteers = await this.volRepo.count({ where: { isActive: true } });
+    const result = await this.volRepo
+      .createQueryBuilder('v')
+      .select('SUM(v.points)', 'totalPoints')
+      .addSelect('AVG(v.totalContributions)', 'avgContributions')
+      .addSelect('AVG(v.accuracyScore)', 'avgAccuracy')
+      .getRawOne();
+
+    return {
+      totalVolunteers,
+      activeVolunteers,
+      totalPoints: Number(result?.totalPoints) || 0,
+      avgContributions: Number(result?.avgcontributions) || Number(result?.avgContributions) || 0,
+      avgAccuracy: Number(result?.avgaccuracy) || Number(result?.avgAccuracy) || 0,
+    };
+  }
+
   async getContributions(userId: string) {
     const volunteer = await this.volRepo.findOne({ where: { userId } });
     if (!volunteer) throw new NotFoundException('Volunteer not found');

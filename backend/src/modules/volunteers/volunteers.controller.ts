@@ -31,6 +31,21 @@ export class VolunteersController {
     return this.volunteersService.getAvailableBadges();
   }
 
+  @Get('stats')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Get volunteer statistics' })
+  async getStats() {
+    return this.volunteersService.getStats();
+  }
+
+  @Get('contributions/:userId')
+  @ApiOperation({ summary: 'Get volunteer contribution history' })
+  @ApiParam({ name: 'userId', type: String })
+  async getContributions(@Param('userId') userId: string) {
+    return this.volunteersService.getContributions(userId);
+  }
+
   @Get(':userId')
   @ApiOperation({ summary: 'Get volunteer profile by user ID' })
   @ApiParam({ name: 'userId', type: String })
@@ -48,12 +63,5 @@ export class VolunteersController {
     @Query('badgeId') badgeId: string,
   ) {
     return this.volunteersService.assignBadge(userId, badgeId);
-  }
-
-  @Get('contributions/:userId')
-  @ApiOperation({ summary: 'Get volunteer contribution history' })
-  @ApiParam({ name: 'userId', type: String })
-  async getContributions(@Param('userId') userId: string) {
-    return this.volunteersService.getContributions(userId);
   }
 }
