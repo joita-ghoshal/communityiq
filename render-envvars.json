@@ -1,0 +1,30 @@
+{
+  "envVars": [
+    { "key": "NODE_ENV", "value": "production" },
+    { "key": "PORT", "value": "3001" },
+    { "key": "APP_NAME", "value": "CommunityIQ" },
+    { "key": "APP_URL", "value": "https://communityiq-api.onrender.com" },
+    { "key": "API_PREFIX", "value": "api/v1" },
+    { "key": "DB_HOST", "value": "dpg-d996uf6cjfls73fqknt0-a.oregon-postgres.render.com" },
+    { "key": "DB_PORT", "value": "5432" },
+    { "key": "DB_USERNAME", "value": "communityiq_admin" },
+    { "key": "DB_PASSWORD", "value": "ef8OgwbWRMLeoS4T9IO0lQbcIv03qOZJ" },
+    { "key": "DB_DATABASE", "value": "communityiq" },
+    { "key": "DB_SSL", "value": "true" },
+    { "key": "DB_SYNCHRONIZE", "value": "true" },
+    { "key": "DB_LOGGING", "value": "false" },
+    { "key": "REDIS_HOST", "value": "" },
+    { "key": "REDIS_PORT", "value": "6379" },
+    { "key": "REDIS_PASSWORD", "value": "" },
+    { "key": "REDIS_DB", "value": "0" },
+    { "key": "REDIS_TTL", "value": "60" },
+    { "key": "JWT_SECRET", "value": "c1mmun1ty1q-s3cur3-jwt-t0k3n-2024-pr0d" },
+    { "key": "JWT_EXPIRATION", "value": "15m" },
+    { "key": "JWT_REFRESH_SECRET", "value": "c1mmun1ty1q-r3fr3sh-t0k3n-2024-pr0d" },
+    { "key": "JWT_REFRESH_EXPIRATION", "value": "7d" },
+    { "key": "MFA_ISSUER", "value": "CommunityIQ" },
+    { "key": "THROTTLE_TTL", "value": "60000" },
+    { "key": "THROTTLE_LIMIT", "value": "10" },
+    { "key": "CORS_ORIGINS", "value": "https://frontend-eight-zeta-30.vercel.app,https://communityiq.vercel.app" }
+  ]
+}
