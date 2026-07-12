@@ -20,7 +20,7 @@ export class AnalyticsService {
     if (city) qb.where('issue.city ILIKE :city', { city: `%${city}%` });
 
     const totalIssues = await qb.getCount();
-    const openCount = await qb.clone().andWhere('issue.status = :s', { s: IssueStatus.OPEN }).getCount();
+    const openCount = await qb.clone().andWhere('issue.status = :s', { s: IssueStatus.REPORTED }).getCount();
     const inProgressCount = await qb.clone().andWhere('issue.status = :s', { s: IssueStatus.IN_PROGRESS }).getCount();
     const resolvedCount = await qb.clone().andWhere('issue.status = :s', { s: IssueStatus.RESOLVED }).getCount();
     const criticalCount = await qb.clone().andWhere("issue.priority IN ('critical', 'emergency')").getCount();
@@ -52,7 +52,7 @@ export class AnalyticsService {
       departments.map(async (dept) => {
         const total = await this.issueRepo.count({ where: { departmentId: dept.id } });
         const resolved = await this.issueRepo.count({ where: { departmentId: dept.id, status: IssueStatus.RESOLVED } });
-        const open = await this.issueRepo.count({ where: { departmentId: dept.id, status: IssueStatus.OPEN } });
+        const open = await this.issueRepo.count({ where: { departmentId: dept.id, status: IssueStatus.REPORTED } });
         const critical = await this.issueRepo.createQueryBuilder('i')
           .where('i.departmentId = :did', { did: dept.id })
           .andWhere("i.priority IN ('critical', 'emergency')")

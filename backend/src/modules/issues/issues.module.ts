@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { IssuesController } from './issues.controller';
 import { IssuesService } from './issues.service';
+import { IssueLifecycleService } from './issue-lifecycle.service';
 import { Issue } from '../../database/entities/issue.entity';
 import { IssueMedia } from '../../database/entities/issue-media.entity';
 import { IssueTimeline } from '../../database/entities/issue-timeline.entity';
@@ -14,7 +15,7 @@ import { AuthModule } from '../auth/auth.module';
     AuthModule,
   ],
   controllers: [IssuesController],
-  providers: [IssuesService],
-  exports: [IssuesService],
+  providers: [IssuesService, IssueLifecycleService],
+  exports: [IssuesService, IssueLifecycleService],
 })
 export class IssuesModule {}

@@ -281,6 +281,11 @@
   100% { background-position: 200% 0; }
 }
 
+@keyframes pulse-ring {
+  0% { transform: scale(0.8); opacity: 1; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
 @keyframes aurora {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
@@ -304,4 +309,166 @@
     background-size: 200% 200%;
     animation: aurora 8s ease-in-out infinite;
   }
+}
+
+/* === PREMIUM ENTERPRISE UPGRADES === */
+
+/* Back Navigation Button */
+.back-btn {
+  @apply flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-all duration-300 hover:translate-x-[-4px];
+}
+.back-btn:hover svg {
+  @apply transition-transform duration-300 -translate-x-[2px];
+}
+
+/* Premium Hover Animations */
+.hover-lift {
+  @apply transition-all duration-300 ease-out;
+}
+.hover-lift:hover {
+  @apply -translate-y-1 shadow-lg shadow-black/5;
+}
+
+.hover-glow {
+  @apply transition-all duration-300;
+}
+.hover-glow:hover {
+  @apply shadow-lg shadow-blue-500/10 ring-1 ring-blue-500/20;
+}
+
+.hover-scale {
+  @apply transition-all duration-200 ease-out;
+}
+.hover-scale:hover {
+  @apply scale-[1.02];
+}
+
+.hover-border {
+  @apply transition-all duration-300 border border-transparent;
+}
+.hover-border:hover {
+  @apply border-slate-200 dark:border-slate-700;
+}
+
+/* Table Row Hover */
+.table-row-hover {
+  @apply transition-all duration-200 hover:bg-slate-50/80 dark:hover:bg-slate-800/50;
+}
+
+/* Sidebar Item Hover */
+.sidebar-item-hover {
+  @apply transition-all duration-200 ease-out;
+}
+.sidebar-item-hover:hover {
+  @apply translate-x-1;
+}
+
+/* Progress Bar Animations */
+.progress-bar-fill {
+  @apply transition-all duration-700 ease-out;
+}
+
+/* Circular Progress */
+.circular-progress {
+  @apply relative inline-flex items-center justify-center;
+}
+.circular-progress svg {
+  @apply transform -rotate-90;
+}
+.circular-progress .progress-text {
+  @apply absolute text-xs font-bold;
+}
+
+/* Module Color Themes */
+.module-ai { --module-primary: #3b82f6; --module-secondary: #8b5cf6; --module-accent: #06b6d4; }
+.module-emergency { --module-primary: #ef4444; --module-secondary: #f97316; --module-accent: #eab308; }
+.module-government { --module-primary: #1e3a5f; --module-secondary: #d4a537; --module-accent: #0ea5e9; }
+.module-community { --module-primary: #10b981; --module-secondary: #14b8a6; --module-accent: #22d3ee; }
+.module-analytics { --module-primary: #6366f1; --module-secondary: #10b981; --module-accent: #3b82f6; }
+.module-map { --module-primary: #92400e; --module-secondary: #78716c; --module-accent: #d97706; }
+
+/* Module Gradient Backgrounds */
+.bg-module-ai {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(139, 92, 246, 0.05) 50%, rgba(6, 182, 212, 0.05) 100%);
+}
+.bg-module-emergency {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.05) 0%, rgba(249, 115, 22, 0.05) 50%, rgba(234, 179, 8, 0.05) 100%);
+}
+.bg-module-government {
+  background: linear-gradient(135deg, rgba(30, 58, 95, 0.05) 0%, rgba(212, 165, 55, 0.05) 50%, rgba(14, 165, 233, 0.05) 100%);
+}
+.bg-module-community {
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(20, 184, 166, 0.05) 50%, rgba(34, 211, 238, 0.05) 100%);
+}
+.bg-module-analytics {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(16, 185, 129, 0.05) 50%, rgba(59, 130, 246, 0.05) 100%);
+}
+
+/* Status Badge Colors */
+.status-reported { @apply bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300; }
+.status-ai_analyzing { @apply bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300; }
+.status-community_verification { @apply bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300; }
+.status-verified { @apply bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300; }
+.status-assigned { @apply bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300; }
+.status-work_started { @apply bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300; }
+.status-in_progress { @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300; }
+.status-partially_resolved { @apply bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300; }
+.status-awaiting_ai_verification { @apply bg-cyan-100 text-cyan-800 dark:bg-cyan-900/30 dark:text-cyan-300; }
+.status-awaiting_citizen_confirmation { @apply bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300; }
+.status-resolved { @apply bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300; }
+.status-closed { @apply bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300; }
+.status-archived { @apply bg-slate-100 text-slate-800 dark:bg-slate-900/30 dark:text-slate-300; }
+.status-duplicate { @apply bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300; }
+.status-reopened { @apply bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300; }
+.status-invalid { @apply bg-gray-100 text-gray-500 dark:bg-gray-900/30 dark:text-gray-400; }
+
+/* Priority Colors */
+.priority-low { @apply text-green-600 dark:text-green-400; }
+.priority-medium { @apply text-yellow-600 dark:text-yellow-400; }
+.priority-high { @apply text-orange-600 dark:text-orange-400; }
+.priority-critical { @apply text-red-600 dark:text-red-400; }
+.priority-emergency { @apply text-red-700 dark:text-red-300 font-bold; }
+
+/* Skeleton Loading Animation */
+.skeleton {
+  @apply bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 dark:from-slate-700 dark:via-slate-600 dark:to-slate-700 rounded-lg;
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Toast customization */
+.toast-enter {
+  animation: slideInRight 0.3s ease-out;
+}
+.toast-exit {
+  animation: slideOutRight 0.3s ease-in;
+}
+@keyframes slideInRight {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes slideOutRight {
+  from { transform: translateX(0); opacity: 1; }
+  to { transform: translateX(100%); opacity: 0; }
+}
+
+/* Pulse ring animation for notifications */
+.pulse-ring {
+  @apply relative;
+}
+.pulse-ring::after {
+  content: '';
+  @apply absolute inset-0 rounded-full;
+  animation: pulse-ring 1.5s ease-out infinite;
+  border: 2px solid currentColor;
+  opacity: 0.3;
+}
+
+/* Page transition */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.page-enter {
+  animation: fadeSlideUp 0.3s ease-out;
 }

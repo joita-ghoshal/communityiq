@@ -10,6 +10,7 @@ import { Issue, IssueStatus, IssuePriority, IssueCategory } from '../../database
 import { IssueMedia } from '../../database/entities/issue-media.entity';
 import { IssueTimeline, TimelineAction } from '../../database/entities/issue-timeline.entity';
 import { Comment } from '../../database/entities/comment.entity';
+import { IssueLifecycleService } from './issue-lifecycle.service';
 import { CreateIssueDto } from './dto/create-issue.dto';
 import { UpdateIssueDto } from './dto/update-issue.dto';
 import { QueryIssueDto } from './dto/query-issue.dto';
@@ -25,6 +26,7 @@ export class IssuesService {
     private readonly timelineRepository: Repository<IssueTimeline>,
     @InjectRepository(Comment)
     private readonly commentRepository: Repository<Comment>,
+    private readonly lifecycleService: IssueLifecycleService,
   ) {}
 
   async findAll(queryDto: QueryIssueDto) {
@@ -218,32 +220,7 @@ export class IssuesService {
   }
 
   async updateStatus(id: string, status: string, userId: string) {
-    const issue = await this.issueRepository.findOne({ where: { id } });
-
-    if (!issue) {
-      throw new NotFoundException(`Issue with ID ${id} not found`);
-    }
-
-    const validStatuses = Object.values(IssueStatus);
-    if (!validStatuses.includes(status as IssueStatus)) {
-      throw new BadRequestException(`Invalid status. Must be one of: ${validStatuses.join(', ')}`);
-    }
-
-    const oldStatus = issue.status;
-    issue.status = status as IssueStatus;
-
-    if (status === IssueStatus.RESOLVED) {
-      issue.resolvedAt = new Date();
-    }
-
-    await this.issueRepository.save(issue);
-
-    await this.addTimelineEvent(id, TimelineAction.STATUS_CHANGED, userId, {
-      from: oldStatus,
-      to: status,
-    });
-
-    return this.findOne(id);
+    return this.lifecycleService.transitionStatus(id, status as IssueStatus, userId);
   }
 
   async assign(id: string, departmentId: string, assignedToId: string, userId: string) {
@@ -269,7 +246,7 @@ export class IssuesService {
 
   async getStats() {
     const totalIssues = await this.issueRepository.count();
-    const openIssues = await this.issueRepository.count({ where: { status: IssueStatus.OPEN } });
+    const openIssues = await this.issueRepository.count({ where: { status: IssueStatus.REPORTED } });
     const inProgressIssues = await this.issueRepository.count({ where: { status: IssueStatus.IN_PROGRESS } });
     const resolvedIssues = await this.issueRepository.count({ where: { status: IssueStatus.RESOLVED } });
 

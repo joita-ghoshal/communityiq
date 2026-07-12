@@ -21,6 +21,8 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 import { IssuesService } from './issues.service';
+import { IssueLifecycleService } from './issue-lifecycle.service';
+import { IssueStatus } from '../../database/entities/issue.entity';
 import { CreateIssueDto } from './dto/create-issue.dto';
 import { UpdateIssueDto } from './dto/update-issue.dto';
 import { QueryIssueDto } from './dto/query-issue.dto';
@@ -30,7 +32,10 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 @ApiTags('Issues')
 @Controller('issues')
 export class IssuesController {
-  constructor(private readonly issuesService: IssuesService) {}
+  constructor(
+    private readonly issuesService: IssuesService,
+    private readonly lifecycleService: IssueLifecycleService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Get all issues with filtering and pagination' })
@@ -170,5 +175,91 @@ export class IssuesController {
     @Body('parentId') parentId?: string,
   ) {
     return this.issuesService.addComment(id, content, userId, parentId);
+  }
+
+  @Patch(':id/transition')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Transition issue status with validation' })
+  async transitionStatus(
+    @Param('id') id: string,
+    @Body('status') status: IssueStatus,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('name') userName?: string,
+    @CurrentUser('role') userRole?: string,
+  ) {
+    return this.lifecycleService.transitionStatus(id, status, userId, userName, userRole);
+  }
+
+  @Patch(':id/progress')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Update issue progress' })
+  async updateProgress(
+    @Param('id') id: string,
+    @Body('percentage') percentage: number,
+    @Body('pendingWork') pendingWork?: string,
+    @Body('completedWork') completedWork?: string,
+    @Body('remainingTasks') remainingTasks?: string,
+    @Body('estimatedCompletion') estimatedCompletion?: Date,
+    @Body('responsibleTeam') responsibleTeam?: string,
+    @CurrentUser('id') userId?: string,
+    @CurrentUser('name') userName?: string,
+    @CurrentUser('role') userRole?: string,
+  ) {
+    return this.lifecycleService.updateProgress(
+      id, percentage, pendingWork, completedWork, remainingTasks,
+      estimatedCompletion, responsibleTeam, userId, userName, userRole,
+    );
+  }
+
+  @Post(':id/evidence')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Upload before/after evidence' })
+  async uploadEvidence(
+    @Param('id') id: string,
+    @Body('beforePhotos') beforePhotos: string[],
+    @Body('afterPhotos') afterPhotos: string[],
+    @Body('workNotes') workNotes: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('name') userName: string,
+    @CurrentUser('role') userRole: string,
+  ) {
+    return this.lifecycleService.uploadEvidence(id, userId, userName, userRole, { beforePhotos, afterPhotos, workNotes });
+  }
+
+  @Post(':id/citizen-confirm')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Citizen confirm or reject resolution' })
+  async citizenConfirm(
+    @Param('id') id: string,
+    @Body('confirmed') confirmed: boolean,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('name') userName: string,
+  ) {
+    return this.lifecycleService.confirmCitizenResolution(id, confirmed, userId, userName);
+  }
+
+  @Post(':id/escalate')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Escalate issue' })
+  async escalate(
+    @Param('id') id: string,
+    @Body('reason') reason: string,
+    @CurrentUser('id') userId: string,
+    @CurrentUser('name') userName?: string,
+    @CurrentUser('role') userRole?: string,
+  ) {
+    return this.lifecycleService.escalateIssue(id, reason, userId, userName, userRole);
+  }
+
+  @Get(':id/valid-transitions')
+  @ApiOperation({ summary: 'Get valid next statuses' })
+  async getValidTransitions(@Param('id') id: string) {
+    const issue = await this.issuesService.findOne(id);
+    return this.lifecycleService.getValidTransitions(issue.status);
   }
 }

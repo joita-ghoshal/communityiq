@@ -92,11 +92,11 @@ export const pageThemes: Record<string, PageTheme> = {
     icon: "🏛️",
   },
   ai_assistant: {
-    background: "from-[hsl(200,50%,96%)] via-[hsl(195,45%,94%)] to-[hsl(200,40%,95%)] dark:from-[hsl(222,33%,8%)] dark:via-[hsl(220,30%,11%)] dark:to-[hsl(218,28%,13%)]",
-    gradient: "from-sky-400/10 via-cyan-300/8 to-blue-200/10 dark:from-sky-500/10 dark:via-cyan-500/8 dark:to-blue-400/10",
-    cardAccent: "from-sky-500 to-cyan-500",
-    description: "AI-powered civic assistant",
-    icon: "🤖",
+    background: 'bg-gradient-to-br from-blue-50 via-indigo-50 to-cyan-50 dark:from-blue-950/20 dark:via-indigo-950/20 dark:to-cyan-950/20',
+    gradient: 'from-blue-500 via-indigo-500 to-cyan-500',
+    cardAccent: 'border-blue-200 dark:border-blue-800',
+    description: 'text-blue-600 dark:text-blue-400',
+    icon: '🤖',
   },
 };
 
@@ -141,3 +141,41 @@ export const severityColors = {
 } as const;
 
 export type SeverityLevel = keyof typeof severityColors;
+
+export const lifecycleStatusColors: Record<string, string> = {
+  reported: '#3b82f6',
+  ai_analyzing: '#6366f1',
+  community_verification: '#a855f7',
+  verified: '#8b5cf6',
+  assigned: '#f97316',
+  work_started: '#f59e0b',
+  in_progress: '#eab308',
+  partially_resolved: '#14b8a6',
+  awaiting_ai_verification: '#06b6d4',
+  awaiting_citizen_confirmation: '#22c55e',
+  resolved: '#10b981',
+  closed: '#6b7280',
+  archived: '#94a3b8',
+  duplicate: '#ef4444',
+  reopened: '#ec4899',
+  invalid: '#9ca3af',
+};
+
+export const statusLabels: Record<string, string> = {
+  reported: 'Reported',
+  ai_analyzing: 'AI Analyzing',
+  community_verification: 'Community Verification',
+  verified: 'Verified',
+  assigned: 'Assigned',
+  work_started: 'Work Started',
+  in_progress: 'In Progress',
+  partially_resolved: 'Partially Resolved',
+  awaiting_ai_verification: 'Awaiting AI Verification',
+  awaiting_citizen_confirmation: 'Awaiting Citizen Confirmation',
+  resolved: 'Resolved',
+  closed: 'Closed',
+  archived: 'Archived',
+  duplicate: 'Duplicate',
+  reopened: 'Reopened',
+  invalid: 'Invalid',
+};

@@ -409,7 +409,7 @@ Provide 3-5 insights covering trends, patterns, and recommendations.`;
 
     const stats = {
       total: issues.length,
-      open: issues.filter((i) => i.status === IssueStatus.OPEN).length,
+      open: issues.filter((i) => i.status === IssueStatus.REPORTED).length,
       resolved: issues.filter((i) => i.status === IssueStatus.RESOLVED).length,
       critical: issues.filter((i) => i.priority === IssuePriority.CRITICAL || i.priority === IssuePriority.EMERGENCY).length,
       categories: {} as Record<string, number>,
@@ -487,7 +487,7 @@ Provide 3-5 insights covering trends, patterns, and recommendations.`;
 
     if (issue.category === 'public_safety' || issue.category === 'building_safety') { risk += 20; factors.push('Safety category'); }
     if (issue.category === 'flooding' || issue.category === 'electricity') { risk += 15; factors.push('Infrastructure risk'); }
-    if (issue.status === IssueStatus.OPEN && issue.createdAt) {
+    if (issue.status === IssueStatus.REPORTED && issue.createdAt) {
       const daysSince = Math.floor((Date.now() - new Date(issue.createdAt).getTime()) / 86400000);
       if (daysSince > 7) { risk += 10; factors.push(`Open for ${daysSince} days`); }
       if (daysSince > 30) { risk += 15; factors.push('Long-standing issue'); }
@@ -580,6 +580,115 @@ Provide 3-5 insights covering trends, patterns, and recommendations.`;
 
   private generateFallbackSummary(stats: any, days: number): string {
     return `Over the last ${days} days, ${stats.total} issues were reported. ${stats.resolved} have been resolved (${stats.total > 0 ? Math.round((stats.resolved / stats.total) * 100) : 0}% resolution rate). ${stats.critical} critical issues remain. Top categories: ${Object.entries(stats.categories).sort((a: any, b: any) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k}(${v})`).join(', ')}.`;
+  }
+
+  async analyzeSeverity(description: string, category: string) {
+    const factors = {
+      keywords: {
+        dangerous: ['collapse', 'fire', 'flood', 'electrical', 'gas leak', 'explosion', 'poison'],
+        urgent: ['broken', 'damaged', 'blocked', 'overflowing', 'leaking', 'cracked'],
+        moderate: ['crack', 'stain', 'noise', 'dust', 'odor', 'minor'],
+      }
+    };
+
+    const text = description.toLowerCase();
+    let severity = 50;
+    let riskScore = 30;
+
+    for (const keyword of factors.keywords.dangerous) {
+      if (text.includes(keyword)) { severity += 15; riskScore += 20; }
+    }
+    for (const keyword of factors.keywords.urgent) {
+      if (text.includes(keyword)) { severity += 8; riskScore += 10; }
+    }
+    for (const keyword of factors.keywords.moderate) {
+      if (text.includes(keyword)) { severity += 3; riskScore += 5; }
+    }
+
+    const categoryRisk: Record<string, number> = {
+      road_damage: 60, water_supply: 55, sanitation: 50, electricity: 80,
+      garbage: 30, drainage: 55, street_lighting: 35, public_safety: 85,
+      noise_pollution: 25, air_pollution: 65, parks_green: 20, traffic: 60,
+      building_safety: 90, flooding: 85, animal_control: 50, other: 40,
+    };
+    severity += (categoryRisk[category] || 40) * 0.3;
+    riskScore += (categoryRisk[category] || 40) * 0.2;
+
+    severity = Math.min(100, Math.max(0, Math.round(severity)));
+    riskScore = Math.min(100, Math.max(0, Math.round(riskScore)));
+
+    return {
+      severity,
+      riskScore,
+      priority: severity >= 80 ? 'critical' : severity >= 60 ? 'high' : severity >= 40 ? 'medium' : 'low',
+      estimatedResolutionTime: severity >= 80 ? '24 hours' : severity >= 60 ? '48 hours' : severity >= 40 ? '1 week' : '2 weeks',
+      factors: {
+        textSeverity: severity,
+        categoryRisk: categoryRisk[category] || 40,
+      },
+    };
+  }
+
+  async detectDuplicate(title: string, description: string, lat?: number, lng?: number) {
+    try {
+      const issues = await this.issueRepository.find({ take: 100, order: { createdAt: 'DESC' } });
+      const text = `${title} ${description}`.toLowerCase();
+      const duplicates: Array<{ id: string; title: string; similarity: number }> = [];
+
+      for (const issue of issues) {
+        const existingText = `${issue.title} ${issue.description}`.toLowerCase();
+        const words1 = text.split(/\s+/);
+        const words2 = existingText.split(/\s+/);
+        const intersection = words1.filter(w => words2.includes(w));
+        const similarity = intersection.length / Math.max(words1.length, words2.length);
+
+        if (similarity > 0.3) {
+          duplicates.push({ id: issue.id, title: issue.title, similarity: Math.round(similarity * 100) });
+        }
+      }
+
+      duplicates.sort((a, b) => b.similarity - a.similarity);
+      return { isDuplicate: duplicates.length > 0, duplicates: duplicates.slice(0, 5) };
+    } catch {
+      return { isDuplicate: false, duplicates: [] };
+    }
+  }
+
+  async detectFakeReport(description: string, userId: string, metadata?: Record<string, any>) {
+    let riskScore = 10;
+    const flags: string[] = [];
+
+    const text = description.toLowerCase();
+    if (text.length < 20) { riskScore += 25; flags.push('Very short description'); }
+    if (text.split(' ').length < 5) { riskScore += 15; flags.push('Too few details'); }
+    if (/[A-Z]{5,}/.test(description)) { riskScore += 10; flags.push('Excessive caps'); }
+    if (/[!]{3,}/.test(description)) { riskScore += 10; flags.push('Excessive punctuation'); }
+
+    const vagueWords = ['stuff', 'thing', 'something', 'someone', 'somewhere'];
+    for (const word of vagueWords) {
+      if (text.includes(word)) { riskScore += 5; flags.push(`Vague word: "${word}"`); }
+    }
+
+    riskScore = Math.min(100, riskScore);
+
+    return {
+      isFake: riskScore >= 60,
+      confidence: riskScore,
+      flags,
+      recommendation: riskScore >= 60 ? 'manual_review' : riskScore >= 30 ? 'additional_info_needed' : 'auto_approve',
+    };
+  }
+
+  async generateIssueSummary(title: string, description: string, category: string) {
+    const sentences = description.split(/[.!?]+/).filter(s => s.trim().length > 5);
+    const keyPoints = sentences.slice(0, 3).map(s => s.trim());
+
+    return {
+      summary: keyPoints.join('. ') + '.',
+      keyPoints,
+      category,
+      estimatedUrgency: description.length > 200 ? 'high' : description.length > 100 ? 'medium' : 'low',
+    };
   }
 
   async chat(message: string, conversationHistory: Array<{ role: string; content: string }> = []): Promise<{ response: string; suggestions?: string[] }> {

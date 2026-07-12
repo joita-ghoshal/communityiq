@@ -32,13 +32,21 @@ export enum IssueCategory {
 }
 
 export enum IssueStatus {
-  OPEN = 'open',
-  TRIAGED = 'triaged',
+  REPORTED = 'reported',
+  AI_ANALYZING = 'ai_analyzing',
+  COMMUNITY_VERIFICATION = 'community_verification',
+  VERIFIED = 'verified',
+  ASSIGNED = 'assigned',
+  WORK_STARTED = 'work_started',
   IN_PROGRESS = 'in_progress',
+  PARTIALLY_RESOLVED = 'partially_resolved',
+  AWAITING_AI_VERIFICATION = 'awaiting_ai_verification',
+  AWAITING_CITIZEN_CONFIRMATION = 'awaiting_citizen_confirmation',
   RESOLVED = 'resolved',
   CLOSED = 'closed',
-  REOPENED = 'reopened',
+  ARCHIVED = 'archived',
   DUPLICATE = 'duplicate',
+  REOPENED = 'reopened',
   INVALID = 'invalid',
 }
 
@@ -64,7 +72,7 @@ export class Issue {
   @Column({ type: 'enum', enum: IssueCategory })
   category: IssueCategory;
 
-  @Column({ type: 'enum', enum: IssueStatus, default: IssueStatus.OPEN })
+  @Column({ type: 'enum', enum: IssueStatus, default: IssueStatus.REPORTED })
   status: IssueStatus;
 
   @Column({ type: 'enum', enum: IssuePriority, default: IssuePriority.MEDIUM })
@@ -152,6 +160,12 @@ export class Issue {
   @Column({ type: 'timestamp', nullable: true })
   resolvedAt: Date;
 
+  @Column({ type: 'timestamp', nullable: true })
+  closedAt: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  archivedAt: Date;
+
   @Column({ default: false })
   isUrgent: boolean;
 
@@ -161,9 +175,64 @@ export class Issue {
   @Column({ nullable: true })
   externalRef: string;
 
+  @Column({ type: 'int', default: 0 })
+  completionPercentage: number;
+
+  @Column({ type: 'text', nullable: true })
+  pendingWork: string;
+
+  @Column({ type: 'text', nullable: true })
+  completedWork: string;
+
+  @Column({ type: 'text', nullable: true })
+  remainingTasks: string;
+
+  @Column({ nullable: true })
+  estimatedCompletion: Date;
+
+  @Column({ nullable: true })
+  currentResponsibleTeam: string;
+
+  @Column({ type: 'jsonb', nullable: true })
+  verificationData: {
+    beforePhotos?: string[];
+    afterPhotos?: string[];
+    workNotes?: string;
+    aiVerified?: boolean;
+    aiConfidence?: number;
+    aiVerificationResult?: string;
+    citizenConfirmed?: boolean;
+    citizenConfirmationDate?: Date;
+    evidenceUploadedBy?: string;
+    evidenceUploadedAt?: Date;
+  };
+
+  @Column({ type: 'jsonb', nullable: true })
+  slaData: {
+    deadline?: Date;
+    warningAt?: Date;
+    breachedAt?: Date;
+    slaStatus?: string;
+    escalationLevel?: number;
+  };
+
+  @Column({ type: 'int', nullable: true })
+  slaDays: number;
+
+  @Column({ type: 'jsonb', nullable: true })
+  metadata: Record<string, any>;
+
   @CreateDateColumn()
   createdAt: Date;
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  get isActive(): boolean {
+    return ![IssueStatus.RESOLVED, IssueStatus.CLOSED, IssueStatus.ARCHIVED, IssueStatus.INVALID].includes(this.status);
+  }
+
+  get isVisibleOnMap(): boolean {
+    return ![IssueStatus.RESOLVED, IssueStatus.CLOSED, IssueStatus.ARCHIVED, IssueStatus.DUPLICATE, IssueStatus.INVALID].includes(this.status);
+  }
 }
