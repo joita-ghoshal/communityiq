@@ -6,6 +6,7 @@ import {
   MapIcon, Squares2X2Icon, ListBulletIcon, MapPinIcon, ViewfinderCircleIcon,
 } from '@heroicons/react/24/outline';
 import AppShell from '@/components/layout/AppShell';
+import api from '@/lib/api';
 import { pageThemes } from '@/lib/theme/page-themes';
 import { getCategoryIcon, getStatusColor } from '@/lib/utils';
 
@@ -20,13 +21,20 @@ const catToInternal: Record<string, string> = {
   'Safety': 'public_safety',
 };
 
-const mockMapIssues = [
-  { id: '1', title: 'Broken streetlight', category: 'street_lighting', status: 'in_progress', priority: 'high', lat: 28.6139, lng: 77.209, distance: '0.3 km' },
-  { id: '2', title: 'Water leakage on road', category: 'water_leakage', status: 'verified', priority: 'critical', lat: 28.6200, lng: 77.215, distance: '0.8 km' },
-  { id: '3', title: 'Garbage dump', category: 'garbage', status: 'reported', priority: 'medium', lat: 28.6080, lng: 77.200, distance: '1.2 km' },
-  { id: '4', title: 'Pothole on highway', category: 'road_damage', status: 'assigned', priority: 'high', lat: 28.6250, lng: 77.218, distance: '1.5 km' },
-  { id: '5', title: 'Fallen tree', category: 'environmental', status: 'community_verifying', priority: 'medium', lat: 28.6110, lng: 77.212, distance: '0.6 km' },
-];
+interface MapIssue {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  status: string;
+  priority: string;
+  lat: number;
+  lng: number;
+  address?: string;
+  city?: string;
+  reporter?: string;
+  createdAt?: string;
+}
 
 const categoryMarkerColors: Record<string, { color: string; svg: string }> = {
   road_damage: { color: '#f97316', svg: '🛤️' },
@@ -63,11 +71,9 @@ function createPinIcon(L: typeof import('leaflet'), category: string, priority: 
   });
 }
 
-type Issue = typeof mockMapIssues[number];
-
 interface LeafletMapProps {
   center: [number, number];
-  issues: Issue[];
+  issues: MapIssue[];
   onIssueClick: (id: string) => void;
 }
 
@@ -142,7 +148,7 @@ const DynamicLeafletMap = dynamic<LeafletMapProps>(
               <Popup>
                 <div className="p-1 min-w-[180px]">
                   <p className="font-semibold text-sm text-slate-900">{issue.title}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">{issue.distance} away</p>
+                  {issue.address && <p className="text-xs text-slate-500 mt-0.5">{issue.address}</p>}
                   <div className="flex gap-1.5 mt-2">
                     <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${getStatusColor(issue.status)}`}>
                       {issue.status.replace(/_/g, ' ')}
@@ -150,6 +156,7 @@ const DynamicLeafletMap = dynamic<LeafletMapProps>(
                     <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                       issue.priority === 'critical' ? 'bg-red-100 text-red-700' :
                       issue.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                      issue.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
                       'bg-emerald-100 text-emerald-700'
                     }`}>
                       {issue.priority}
@@ -171,12 +178,20 @@ const DynamicLeafletMap = dynamic<LeafletMapProps>(
   { ssr: false }
 );
 
+const priorityOptions = ['all', 'low', 'medium', 'high', 'critical'];
+const statusOptions = ['all', 'open', 'in_progress', 'resolved'];
+
 export default function MapPage() {
   const theme = pageThemes.map;
   const [activeCategory, setActiveCategory] = useState('All');
+  const [activePriority, setActivePriority] = useState('all');
+  const [activeStatus, setActiveStatus] = useState('all');
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
   const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
   const [mapCenter, setMapCenter] = useState<[number, number]>([20.5937, 78.9629]);
+  const [issues, setIssues] = useState<MapIssue[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     navigator.geolocation.getCurrentPosition(
@@ -186,9 +201,69 @@ export default function MapPage() {
     );
   }, []);
 
-  const filteredIssues = activeCategory === 'All'
-    ? mockMapIssues
-    : mockMapIssues.filter((issue) => issue.category === catToInternal[activeCategory]);
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchIssues() {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data } = await api.get('/issues', {
+          params: { page: 1, limit: 200 },
+        });
+        if (cancelled) return;
+        const raw = data?.data?.issues || data?.data || data?.issues || data || [];
+        const list: MapIssue[] = (Array.isArray(raw) ? raw : []).map((item: any) => {
+          let lat = 0;
+          let lng = 0;
+          if (item.location) {
+            if (item.location.type === 'Point' && Array.isArray(item.location.coordinates)) {
+              lng = item.location.coordinates[0];
+              lat = item.location.coordinates[1];
+            } else if (item.location.latitude != null) {
+              lat = item.location.latitude;
+              lng = item.location.longitude;
+            }
+          }
+          if (item.lat != null) lat = item.lat;
+          if (item.lng != null) lng = item.lng;
+          if (item.latitude != null) lat = item.latitude;
+          if (item.longitude != null) lng = item.longitude;
+          return {
+            id: String(item.id ?? item._id ?? ''),
+            title: item.title ?? 'Untitled',
+            description: item.description ?? '',
+            category: item.category ?? 'road_damage',
+            status: item.status ?? 'open',
+            priority: item.priority ?? 'medium',
+            lat,
+            lng,
+            address: item.address,
+            city: item.city,
+            reporter: item.reporter ?? item.reportedBy,
+            createdAt: item.createdAt,
+          };
+        });
+        setIssues(list);
+      } catch (err: any) {
+        if (!cancelled) {
+          setError(err?.response?.data?.message || 'Failed to load issues');
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    fetchIssues();
+    return () => { cancelled = true; };
+  }, []);
+
+  const filteredIssues = issues.filter((issue) => {
+    if (activeCategory !== 'All' && issue.category !== catToInternal[activeCategory]) return false;
+    if (activePriority !== 'all' && issue.priority !== activePriority) return false;
+    if (activeStatus !== 'all' && issue.status !== activeStatus) return false;
+    return true;
+  });
+
+  const selectedIssueData = selectedIssue ? issues.find((i) => i.id === selectedIssue) : null;
 
   const handlePinClick = (id: string) => {
     setSelectedIssue(id || null);
@@ -207,7 +282,9 @@ export default function MapPage() {
                 </div>
                 <div>
                   <h1 className="text-xl font-bold font-heading text-slate-900 dark:text-white">Live Issue Map</h1>
-                  <p className="text-xs text-slate-500">Real-time civic issues in your area</p>
+                  <p className="text-xs text-slate-500">
+                    {loading ? 'Loading issues...' : `${filteredIssues.length} issues shown`}
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -221,8 +298,8 @@ export default function MapPage() {
             </motion.div>
           </div>
 
-          {/* Filters */}
-          <div className="px-4 md:px-6 pb-3">
+          {/* Category Filters */}
+          <div className="px-4 md:px-6 pb-2">
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
               {filterCategories.map((cat) => (
                 <button key={cat} onClick={() => setActiveCategory(cat)}
@@ -233,17 +310,63 @@ export default function MapPage() {
             </div>
           </div>
 
+          {/* Priority & Status Filters */}
+          <div className="px-4 md:px-6 pb-3 flex flex-col sm:flex-row gap-2">
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-thin">
+              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider self-center mr-1">Priority</span>
+              {priorityOptions.map((p) => (
+                <button key={p} onClick={() => setActivePriority(p)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all ${
+                    activePriority === p
+                      ? p === 'critical' ? 'bg-red-600 text-white shadow-md' :
+                        p === 'high' ? 'bg-orange-500 text-white shadow-md' :
+                        p === 'medium' ? 'bg-yellow-500 text-white shadow-md' :
+                        p === 'low' ? 'bg-emerald-500 text-white shadow-md' :
+                        'bg-slate-600 text-white shadow-md'
+                      : 'bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
+                  }`}>
+                  {p === 'all' ? 'All' : p.charAt(0).toUpperCase() + p.slice(1)}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-thin">
+              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider self-center mr-1">Status</span>
+              {statusOptions.map((s) => (
+                <button key={s} onClick={() => setActiveStatus(s)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all ${activeStatus === s ? 'bg-emerald-600 text-white shadow-md' : 'bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
+                  {s === 'all' ? 'All' : s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Map / List Content */}
           <div className="flex-1 px-4 md:px-6 pb-4 min-h-0">
             {viewMode === 'map' ? (
               <div className="h-full rounded-2xl overflow-hidden relative bg-slate-200 dark:bg-slate-800" style={{ minHeight: 'calc(100vh - 16rem)', width: '100%' }}>
-                <Suspense fallback={
+                {loading ? (
                   <div className="h-full w-full flex items-center justify-center">
-                    <div className="text-slate-500 text-sm">Loading map...</div>
+                    <div className="flex flex-col items-center gap-3">
+                      <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                      <p className="text-slate-500 text-sm">Loading issues...</p>
+                    </div>
                   </div>
-                }>
-                  <DynamicLeafletMap center={mapCenter} issues={filteredIssues} onIssueClick={handlePinClick} />
-                </Suspense>
+                ) : error ? (
+                  <div className="h-full w-full flex items-center justify-center">
+                    <div className="text-center">
+                      <p className="text-red-500 text-sm font-medium">{error}</p>
+                      <button onClick={() => window.location.reload()} className="mt-2 text-xs text-emerald-600 hover:underline">Retry</button>
+                    </div>
+                  </div>
+                ) : (
+                  <Suspense fallback={
+                    <div className="h-full w-full flex items-center justify-center">
+                      <div className="text-slate-500 text-sm">Loading map...</div>
+                    </div>
+                  }>
+                    <DynamicLeafletMap center={mapCenter} issues={filteredIssues} onIssueClick={handlePinClick} />
+                  </Suspense>
+                )}
 
                 {/* Legend */}
                 <div className="absolute bottom-4 left-4 z-[1000] bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-xl p-3 text-xs space-y-1.5 shadow-lg">
@@ -257,47 +380,100 @@ export default function MapPage() {
                 </div>
 
                 {/* Issue detail card */}
-                {selectedIssue && (() => {
-                  const issue = mockMapIssues.find((i) => i.id === selectedIssue);
-                  if (!issue) return null;
-                  return (
-                    <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
-                      className="absolute bottom-4 right-4 z-[1000] w-64 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-xl p-4 shadow-xl border border-slate-200 dark:border-slate-700">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900 dark:text-white">{issue.title}</p>
-                          <p className="text-xs text-slate-500 mt-0.5">{issue.distance} away</p>
-                        </div>
-                        <button onClick={() => setSelectedIssue(null)} className="text-slate-400 hover:text-slate-600">×</button>
+                {selectedIssueData && (
+                  <motion.div initial={{ y: 20, opacity: 0 }} animate={{ y: 0, opacity: 1 }}
+                    className="absolute bottom-4 right-4 z-[1000] w-72 max-h-[60vh] overflow-y-auto bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-xl p-4 shadow-xl border border-slate-200 dark:border-slate-700">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{selectedIssueData.title}</p>
+                        {selectedIssueData.address && (
+                          <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+                            <MapPinIcon className="w-3 h-3 flex-shrink-0" /> {selectedIssueData.address}
+                          </p>
+                        )}
                       </div>
-                      <div className="flex gap-2 mt-3">
-                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${getStatusColor(issue.status)}`}>{issue.status.replace(/_/g, ' ')}</span>
-                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${issue.priority === 'critical' ? 'bg-red-100 text-red-700' : issue.priority === 'high' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-700'}`}>{issue.priority}</span>
-                      </div>
-                      <button className="w-full mt-3 !py-2 text-xs font-medium text-white bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg hover:opacity-90 transition">
-                        View Details
-                      </button>
-                    </motion.div>
-                  );
-                })()}
+                      <button onClick={() => setSelectedIssue(null)} className="text-slate-400 hover:text-slate-600 ml-2 text-lg leading-none">&times;</button>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 mt-3">
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${getStatusColor(selectedIssueData.status)}`}>
+                        {selectedIssueData.status.replace(/_/g, ' ')}
+                      </span>
+                      <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                        selectedIssueData.priority === 'critical' ? 'bg-red-100 text-red-700' :
+                        selectedIssueData.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                        selectedIssueData.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-emerald-100 text-emerald-700'
+                      }`}>
+                        {selectedIssueData.priority}
+                      </span>
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
+                        {selectedIssueData.category.replace(/_/g, ' ')}
+                      </span>
+                    </div>
+
+                    {selectedIssueData.description && (
+                      <p className="text-xs text-slate-600 dark:text-slate-400 mt-3 leading-relaxed">{selectedIssueData.description}</p>
+                    )}
+
+                    <div className="mt-3 space-y-1 text-[11px] text-slate-500">
+                      {selectedIssueData.reporter && (
+                        <p>Reported by: <span className="font-medium text-slate-700 dark:text-slate-300">{selectedIssueData.reporter}</span></p>
+                      )}
+                      {selectedIssueData.city && (
+                        <p>City: <span className="font-medium text-slate-700 dark:text-slate-300">{selectedIssueData.city}</span></p>
+                      )}
+                      {selectedIssueData.createdAt && (
+                        <p>Date: <span className="font-medium text-slate-700 dark:text-slate-300">{new Date(selectedIssueData.createdAt).toLocaleDateString()}</span></p>
+                      )}
+                    </div>
+
+                    <button className="w-full mt-3 !py-2 text-xs font-medium text-white bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg hover:opacity-90 transition">
+                      View Full Details
+                    </button>
+                  </motion.div>
+                )}
               </div>
             ) : (
               <div className="space-y-3">
-                {filteredIssues.map((issue, i) => (
-                  <motion.div key={issue.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 * i }}
-                    className="glass-card p-4 cursor-pointer hover:shadow-lg transition-all">
-                    <div className="flex items-center gap-3">
-                      <span className="text-2xl">{getCategoryIcon(issue.category)}</span>
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold text-slate-900 dark:text-white">{issue.title}</p>
-                        <p className="text-xs text-slate-500 flex items-center gap-1"><MapPinIcon className="w-3 h-3" />{issue.distance} away</p>
+                {loading ? (
+                  <div className="flex flex-col items-center gap-3 py-12">
+                    <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-slate-500 text-sm">Loading issues...</p>
+                  </div>
+                ) : error ? (
+                  <div className="text-center py-12">
+                    <p className="text-red-500 text-sm font-medium">{error}</p>
+                    <button onClick={() => window.location.reload()} className="mt-2 text-xs text-emerald-600 hover:underline">Retry</button>
+                  </div>
+                ) : filteredIssues.length === 0 ? (
+                  <div className="text-center py-12 text-slate-400 text-sm">No issues match your filters</div>
+                ) : (
+                  filteredIssues.map((issue, i) => (
+                    <motion.div key={issue.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 * i }}
+                      className="glass-card p-4 cursor-pointer hover:shadow-lg transition-all">
+                      <div className="flex items-center gap-3">
+                        <span className="text-2xl">{getCategoryIcon(issue.category)}</span>
+                        <div className="flex-1">
+                          <p className="text-sm font-semibold text-slate-900 dark:text-white">{issue.title}</p>
+                          <p className="text-xs text-slate-500 flex items-center gap-1">
+                            <MapPinIcon className="w-3 h-3" />
+                            {issue.address || issue.city || 'Location unavailable'}
+                          </p>
+                        </div>
+                        <div className="flex flex-col gap-1 items-end">
+                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${getStatusColor(issue.status)}`}>{issue.status.replace(/_/g, ' ')}</span>
+                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                            issue.priority === 'critical' ? 'bg-red-100 text-red-700' :
+                            issue.priority === 'high' ? 'bg-orange-100 text-orange-700' :
+                            issue.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                            'bg-emerald-100 text-emerald-700'
+                          }`}>{issue.priority}</span>
+                        </div>
                       </div>
-                      <div className="flex flex-col gap-1 items-end">
-                        <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full border ${getStatusColor(issue.status)}`}>{issue.status.replace(/_/g, ' ')}</span>
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
+                    </motion.div>
+                  ))
+                )}
               </div>
             )}
           </div>

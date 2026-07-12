@@ -3,6 +3,7 @@ import './globals.css';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { QueryProvider } from '@/components/providers/QueryProvider';
 import { AuthProvider } from '@/components/providers/AuthProvider';
+import { SocketProvider } from '@/contexts/SocketContext';
 import { Toaster } from 'react-hot-toast';
 import I18nProvider from '@/lib/i18n/provider';
 import AIAgentWrapper from '@/components/ai/AIAgentWrapper';
@@ -28,11 +29,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <QueryProvider>
             <AuthProvider>
-              <I18nProvider>
-                {children}
-                <AIAgentWrapper />
-                <Toaster position="top-right" toastOptions={{ duration: 4000, style: { background: '#1e293b', color: '#f8fafc', borderRadius: '12px', padding: '12px 16px', fontSize: '14px' } }} />
-              </I18nProvider>
+              <SocketProvider>
+                <I18nProvider>
+                  {children}
+                  <AIAgentWrapper />
+                  <Toaster position="top-right" toastOptions={{ duration: 4000, style: { background: '#1e293b', color: '#f8fafc', borderRadius: '12px', padding: '12px 16px', fontSize: '14px' } }} />
+                </I18nProvider>
+              </SocketProvider>
             </AuthProvider>
           </QueryProvider>
         </ThemeProvider>
