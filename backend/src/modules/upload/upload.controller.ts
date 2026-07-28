@@ -20,8 +20,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
-  @Post('file')
-  @Post('image')
+  @Post(['file', 'image'])
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   @ApiBearerAuth('access-token')
