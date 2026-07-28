@@ -38,7 +38,7 @@ interface HeaderProps {
 export default function Header({ onToggleMobileMenu, showBackButton }: HeaderProps) {
   const { user } = useAuthStore();
   const { t, i18n } = useTranslation();
-  const { theme, setTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
 
   const [unreadCount, setUnreadCount] = useState(0);
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -47,7 +47,7 @@ export default function Header({ onToggleMobileMenu, showBackButton }: HeaderPro
   const notifRef = useRef<HTMLDivElement>(null);
 
   const toggleTheme = () => {
-    setTheme(theme === "dark" ? "light" : "dark");
+    setTheme(resolvedTheme === "dark" ? "light" : "dark");
   };
 
   const toggleLanguage = () => {
@@ -189,7 +189,7 @@ export default function Header({ onToggleMobileMenu, showBackButton }: HeaderPro
             className="p-2.5 rounded-xl hover:bg-white/30 dark:hover:bg-slate-700/40 transition-colors group"
             title="Toggle Theme"
           >
-            {theme === "dark" ? (
+            {resolvedTheme === "dark" ? (
               <Sun className="w-5 h-5 text-slate-500 dark:text-slate-400 group-hover:text-amber-500 transition-colors" />
             ) : (
               <Moon className="w-5 h-5 text-slate-500 group-hover:text-blue-600 transition-colors" />
@@ -297,7 +297,7 @@ export default function Header({ onToggleMobileMenu, showBackButton }: HeaderPro
                         onClick={() => { setShowNotifications(false); }}
                         className="text-xs font-medium text-blue-600 dark:text-blue-400 hover:underline"
                       >
-                        View all notifications
+                        Close notifications
                       </button>
                     </div>
                   )}

@@ -18,6 +18,7 @@ export class GisController {
   }
 
   @Get('cluster')
+  @Get('clusters')
   @ApiOperation({ summary: 'Get issue clusters for map' })
   @ApiQuery({ name: 'sw_lat', type: Number })
   @ApiQuery({ name: 'sw_lng', type: Number })
@@ -29,6 +30,7 @@ export class GisController {
   }
 
   @Get('heatmap')
+  @Get('heatmap-data')
   @ApiOperation({ summary: 'Get heatmap data' })
   @ApiQuery({ name: 'city', type: String, required: false })
   @ApiQuery({ name: 'category', type: String, required: false })

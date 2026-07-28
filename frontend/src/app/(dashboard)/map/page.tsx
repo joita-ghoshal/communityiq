@@ -423,7 +423,7 @@ export default function MapPage() {
     }
   };
 
-  const isAdmin = user?.role === 'admin' || user?.role === 'department_admin';
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'municipal_admin' || user?.role === 'department_admin';
 
   return (
     <AppShell>

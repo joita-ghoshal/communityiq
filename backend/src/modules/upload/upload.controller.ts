@@ -21,6 +21,7 @@ export class UploadController {
   constructor(private readonly uploadService: UploadService) {}
 
   @Post('file')
+  @Post('image')
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(FileInterceptor('file'))
   @ApiBearerAuth('access-token')

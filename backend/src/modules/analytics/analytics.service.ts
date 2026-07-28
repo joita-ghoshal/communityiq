@@ -186,4 +186,68 @@ export class AnalyticsService {
       engagementRate: totalVolunteers > 0 ? Math.round((activeVolunteers / totalVolunteers) * 100) : 0,
     };
   }
+
+  async getCategoryBreakdown() {
+    const breakdown = await this.issueRepo
+      .createQueryBuilder('issue')
+      .select('issue.category', 'category')
+      .addSelect('COUNT(*)', 'count')
+      .addSelect("COUNT(CASE WHEN issue.status = 'resolved' THEN 1 END)", 'resolved')
+      .addSelect("COUNT(CASE WHEN issue.status IN ('reported', 'ai_analyzing', 'community_verification', 'verified') THEN 1 END)", 'open')
+      .groupBy('issue.category')
+      .orderBy('count', 'DESC')
+      .getRawMany();
+
+    return breakdown.map((b) => ({
+      category: b.category,
+      count: parseInt(b.count, 10),
+      resolved: parseInt(b.resolved, 10),
+      open: parseInt(b.open, 10),
+      resolutionRate: parseInt(b.count, 10) > 0 ? Math.round((parseInt(b.resolved, 10) / parseInt(b.count, 10)) * 100) : 0,
+    }));
+  }
+
+  async getDepartmentBreakdown() {
+    const breakdown = await this.issueRepo
+      .createQueryBuilder('issue')
+      .leftJoin('issue.department', 'dept')
+      .select('COALESCE(dept.name, \'Unassigned\')', 'departmentName')
+      .addSelect('COALESCE(dept.code, \'N/A\')', 'departmentCode')
+      .addSelect('COUNT(*)', 'count')
+      .addSelect("COUNT(CASE WHEN issue.status = 'resolved' THEN 1 END)", 'resolved')
+      .addSelect('AVG(issue.riskScore)', 'avgRisk')
+      .groupBy('dept.name')
+      .addGroupBy('dept.code')
+      .orderBy('count', 'DESC')
+      .getRawMany();
+
+    return breakdown.map((b) => ({
+      departmentName: b.departmentName,
+      departmentCode: b.departmentCode,
+      count: parseInt(b.count, 10),
+      resolved: parseInt(b.resolved, 10),
+      resolutionRate: parseInt(b.count, 10) > 0 ? Math.round((parseInt(b.resolved, 10) / parseInt(b.count, 10)) * 100) : 0,
+      avgRisk: b.avgRisk ? parseFloat(parseFloat(b.avgRisk).toFixed(1)) : 0,
+    }));
+  }
+
+  async getGeoDistribution() {
+    const points = await this.issueRepo
+      .createQueryBuilder('issue')
+      .select("ST_Y(issue.location::geometry) as lat, ST_X(issue.location::geometry) as lng")
+      .addSelect('COUNT(*)', 'count')
+      .addSelect('AVG(issue.riskScore)', 'avgRisk')
+      .addSelect('AVG(issue.communityScore)', 'avgCommunity')
+      .where('issue.location IS NOT NULL')
+      .groupBy('lat, lng')
+      .getRawMany();
+
+    return points.map((p) => ({
+      lat: parseFloat(p.lat),
+      lng: parseFloat(p.lng),
+      count: parseInt(p.count, 10),
+      avgRisk: p.avgRisk ? parseFloat(parseFloat(p.avgRisk).toFixed(1)) : 0,
+      avgCommunity: p.avgCommunity ? parseFloat(parseFloat(p.avgCommunity).toFixed(1)) : 0,
+    }));
+  }
 }

@@ -116,24 +116,21 @@ export default function GovernmentPage() {
   const [timelinePriorityFilter, setTimelinePriorityFilter] = useState('');
   const [timelineDateFrom, setTimelineDateFrom] = useState('');
   const [timelineDateTo, setTimelineDateTo] = useState('');
-  const [emergencyAlerts, setEmergencyAlerts] = useState<{ id: string; title: string; severity: string; createdAt: string; active: boolean }[]>([
-    { id: '1', title: 'Flash Flood Warning - Low lying areas', severity: 'critical', createdAt: new Date().toISOString(), active: true },
-    { id: '2', title: 'Power outage affecting Sector 5,7,9', severity: 'high', createdAt: new Date(Date.now() - 3600000).toISOString(), active: true },
-    { id: '3', title: 'Road closure - Main St bridge repair', severity: 'medium', createdAt: new Date(Date.now() - 7200000).toISOString(), active: true },
-  ]);
+  const [emergencyAlerts, setEmergencyAlerts] = useState<{ id: string; title: string; severity: string; createdAt: string; active: boolean }[]>([]);
   const [showAlertForm, setShowAlertForm] = useState(false);
   const [newAlert, setNewAlert] = useState({ title: '', severity: 'medium' });
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const [dashRes, issuesRes, deptRes, kpiRes, deptListRes, usersRes] = await Promise.allSettled([
+        const [dashRes, issuesRes, deptRes, kpiRes, deptListRes, usersRes, emergRes] = await Promise.allSettled([
           api.get('/analytics/dashboard'),
           api.get('/issues'),
           api.get('/analytics/department-performance'),
           api.get('/analytics/kpis'),
           api.get('/admin/departments'),
           api.get('/admin/users'),
+          api.get('/emergency/alerts/active'),
         ]);
         if (dashRes.status === 'fulfilled') { const d = dashRes.value.data?.data || dashRes.value.data; setDashboard(d); }
         if (issuesRes.status === 'fulfilled') { const raw = issuesRes.value.data?.data?.data || issuesRes.value.data?.data || issuesRes.value.data; setIssues(Array.isArray(raw) ? raw : []); }
@@ -141,6 +138,17 @@ export default function GovernmentPage() {
         if (kpiRes.status === 'fulfilled') { const raw = kpiRes.value.data?.data?.data || kpiRes.value.data?.data || kpiRes.value.data; setKpis(Array.isArray(raw) ? raw : []); }
         if (deptListRes.status === 'fulfilled') { const raw = deptListRes.value.data?.data?.data || deptListRes.value.data?.data || deptListRes.value.data; setAllDepartments(Array.isArray(raw) ? raw : []); }
         if (usersRes.status === 'fulfilled') { const raw = usersRes.value.data?.data?.data || usersRes.value.data?.data || usersRes.value.data; setUsers(Array.isArray(raw) ? raw : []); }
+        if (emergRes.status === 'fulfilled') {
+          const raw = emergRes.value.data?.data || emergRes.value.data;
+          const alerts = Array.isArray(raw) ? raw : [];
+          setEmergencyAlerts(alerts.map((a: any) => ({
+            id: String(a.id ?? ''),
+            title: a.title ?? a.name ?? 'Emergency Alert',
+            severity: a.severity ?? 'medium',
+            createdAt: a.createdAt ?? new Date().toISOString(),
+            active: a.active ?? true,
+          })));
+        }
       } catch (err) {
         console.error('Failed to load government dashboard', err);
       } finally {

@@ -10,6 +10,7 @@ interface User {
   role: 'citizen' | 'volunteer' | 'department_admin' | 'municipal_admin' | 'super_admin';
   avatar?: string;
   isVerified: boolean;
+  createdAt?: string;
 }
 
 interface AuthState {

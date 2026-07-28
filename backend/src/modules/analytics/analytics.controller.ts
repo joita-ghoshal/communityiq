@@ -54,4 +54,24 @@ export class AnalyticsController {
   async getCommunityHealth(@Query('city') city?: string) {
     return this.analyticsService.getCommunityHealth(city);
   }
+
+  @Get('categories')
+  @ApiOperation({ summary: 'Get issue breakdown by category' })
+  async getCategories() {
+    return this.analyticsService.getCategoryBreakdown();
+  }
+
+  @Get('departments')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.MUNICIPAL_ADMIN, UserRole.SUPER_ADMIN, UserRole.DEPARTMENT_ADMIN)
+  @ApiOperation({ summary: 'Get analytics by department' })
+  async getDepartments() {
+    return this.analyticsService.getDepartmentBreakdown();
+  }
+
+  @Get('geo')
+  @ApiOperation({ summary: 'Get geographic distribution of issues' })
+  async getGeo() {
+    return this.analyticsService.getGeoDistribution();
+  }
 }

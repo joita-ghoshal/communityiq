@@ -24,6 +24,32 @@ export class VolunteersService {
     private readonly userRepo: Repository<User>,
   ) {}
 
+  async findAll(page = 1, limit = 20) {
+    const [volunteers, total] = await this.volRepo
+      .createQueryBuilder('v')
+      .leftJoinAndSelect('v.user', 'user')
+      .orderBy('v.points', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      data: volunteers.map((v) => ({
+        userId: v.userId,
+        name: v.user ? `${v.user.firstName} ${v.user.lastName}` : 'Unknown',
+        avatar: v.user?.avatar,
+        points: v.points,
+        heroLevel: v.heroLevel,
+        badges: v.badges?.length || 0,
+        totalContributions: v.totalContributions,
+        verifiedContributions: v.verifiedContributions,
+        accuracyScore: v.accuracyScore,
+        isActive: v.isActive,
+      })),
+      meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    };
+  }
+
   async getProfile(userId: string) {
     let volunteer = await this.volRepo.findOne({ where: { userId }, relations: ['user'] });
 

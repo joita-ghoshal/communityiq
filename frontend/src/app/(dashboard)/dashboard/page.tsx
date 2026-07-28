@@ -75,7 +75,7 @@ export default function DashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [apiHealthy, setApiHealthy] = useState(true);
-  const { isAuthenticated, isLoading: authLoading } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuthStore();
 
   const fetchDashboard = useCallback(async () => {
     try {
@@ -129,8 +129,8 @@ export default function DashboardPage() {
     return () => clearInterval(interval);
   }, [fetchDashboard, authLoading, isAuthenticated]);
 
-  const userName = typeof window !== 'undefined' ? localStorage.getItem('user_name') || 'Commander' : 'Commander';
-  const userRole = typeof window !== 'undefined' ? localStorage.getItem('user_role') || 'Admin' : 'Admin';
+  const userName = user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'Commander' : 'Commander';
+  const userRole = user?.role?.replace(/_/g, ' ') || 'Admin';
 
   const d = data?.dashboard ?? {};
   const k = data?.kpis ?? {};
@@ -153,7 +153,7 @@ export default function DashboardPage() {
   const quickActions = [
     { label: 'Report Issue', icon: ExclamationTriangleIcon, color: 'from-blue-500 to-indigo-600', href: '/report' },
     { label: 'Find Nearby', icon: MapPinIcon, color: 'from-amber-500 to-orange-600', href: '/map' },
-    { label: 'My Reports', icon: DocumentTextIcon, color: 'from-emerald-500 to-teal-600', href: '/issues' },
+    { label: 'My Reports', icon: DocumentTextIcon, color: 'from-emerald-500 to-teal-600', href: '/map' },
     { label: 'Verify Issue', icon: ShieldCheckIcon, color: 'from-violet-500 to-purple-600', href: '/map' },
     { label: 'View Analytics', icon: ChartBarIcon, color: 'from-pink-500 to-rose-600', href: '/analytics' },
     { label: 'Emergency', icon: FireIcon, color: 'from-red-500 to-red-600', href: '/emergency' },
@@ -344,7 +344,7 @@ export default function DashboardPage() {
                   <DocumentTextIcon className="w-5 h-5 text-blue-500" />
                   <h3 className="text-sm font-bold font-heading text-slate-900 dark:text-white">Recent Issues</h3>
                 </div>
-                <Link href="/issues" className="text-xs font-medium text-blue-500 hover:text-blue-600 transition-colors">
+                <Link href="/map" className="text-xs font-medium text-blue-500 hover:text-blue-600 transition-colors">
                   View All →
                 </Link>
               </div>
@@ -440,8 +440,8 @@ export default function DashboardPage() {
                     <span className="text-[10px] font-bold bg-red-500 text-white px-1.5 py-0.5 rounded-full">{data!.unreadCount}</span>
                   )}
                 </div>
-                <Link href="/notifications" className="text-xs font-medium text-violet-500 hover:text-violet-600 transition-colors">
-                  View All →
+                <Link href="/settings" className="text-xs font-medium text-violet-500 hover:text-violet-600 transition-colors">
+                  Settings →
                 </Link>
               </div>
               {notifications.length === 0 ? (

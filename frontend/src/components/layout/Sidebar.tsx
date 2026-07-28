@@ -39,8 +39,7 @@ const navItems = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { user } = useAuthStore();
-  const { logout } = useAuthStore();
+  const { user, logout } = useAuthStore();
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(false);
 

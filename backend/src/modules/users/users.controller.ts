@@ -11,6 +11,7 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -77,6 +78,22 @@ export class UsersController {
     @Body() updateUserDto: UpdateUserDto,
   ) {
     return this.usersService.update(userId, updateUserDto);
+  }
+
+  @Patch(':id')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({ summary: 'Update user by ID' })
+  @ApiParam({ name: 'id', type: String })
+  async patchUpdate(
+    @Param('id') id: string,
+    @CurrentUser('id') currentUserId: string,
+    @Body() updateUserDto: UpdateUserDto,
+  ) {
+    if (id !== currentUserId) {
+      throw new ForbiddenException('You can only update your own profile');
+    }
+    return this.usersService.update(id, updateUserDto);
   }
 
   @Put(':id')

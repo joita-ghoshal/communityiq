@@ -86,4 +86,12 @@ export class CommunityController {
   async getStats(@Param('issueId') issueId: string) {
     return this.communityService.getIssueStats(issueId);
   }
+
+  @Get('feed')
+  @ApiOperation({ summary: 'Get community activity feed' })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  async feed(@Query('limit') limit = 20, @Query('page') page = 1) {
+    return this.communityService.getFeed(limit, page);
+  }
 }

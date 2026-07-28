@@ -492,7 +492,7 @@ function UsersTab() {
   }, [users, search]);
 
   const getRoleBadge = (role: string) => {
-    const map: Record<string, 'default' | 'success' | 'warning' | 'danger' | 'default'> = {
+    const map: Record<string, 'default' | 'success' | 'warning' | 'danger'> = {
       citizen: 'default', volunteer: 'success', department_admin: 'warning',
       municipal_admin: 'danger', super_admin: 'danger',
     };
@@ -885,7 +885,7 @@ function RolesTab() {
     return grouped;
   }, [users]);
 
-  const badgeVariant = (v: string): 'default' | 'success' | 'warning' | 'danger' | 'default' => {
+  const badgeVariant = (v: string): 'default' | 'success' | 'warning' | 'danger' => {
     const map: Record<string, any> = { default: 'default', success: 'success', warning: 'warning', danger: 'danger', info: 'default' };
     return map[v] || 'default';
   };
@@ -1045,7 +1045,7 @@ function IssuesTab() {
   }, [requests, search]);
 
   const statusBadge = (s: string) => {
-    const map: Record<string, 'default' | 'success' | 'warning' | 'danger' | 'default'> = {
+    const map: Record<string, 'default' | 'success' | 'warning' | 'danger'> = {
       open: 'default', pending: 'warning', in_progress: 'default', approved: 'success', resolved: 'success', rejected: 'danger', closed: 'default',
     };
     return <Badge variant={map[s] || 'default'}>{s?.replace(/_/g, ' ')}</Badge>;

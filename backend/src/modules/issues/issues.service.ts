@@ -230,8 +230,12 @@ export class IssuesService {
       throw new NotFoundException(`Issue with ID ${id} not found`);
     }
 
+    if (!departmentId) {
+      throw new BadRequestException('departmentId is required');
+    }
+
     issue.departmentId = departmentId;
-    issue.assignedToId = assignedToId;
+    if (assignedToId) issue.assignedToId = assignedToId;
     issue.status = IssueStatus.IN_PROGRESS;
 
     await this.issueRepository.save(issue);

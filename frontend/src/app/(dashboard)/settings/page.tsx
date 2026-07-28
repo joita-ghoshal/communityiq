@@ -46,19 +46,45 @@ export default function SettingsPage() {
     lastName: '',
     email: '',
     phone: '',
+    createdAt: '',
   });
   const [editingProfile, setEditingProfile] = useState(false);
-  const [profileDraft, setProfileDraft] = useState({ ...profile });
+  const [profileDraft, setProfileDraft] = useState({ firstName: '', lastName: '', email: '', phone: '' });
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   useEffect(() => {
     api.get('/users/me').then(({ data }) => {
       const u = data?.data || data;
-      const p = { firstName: u.firstName || '', lastName: u.lastName || '', email: u.email || '', phone: u.phone || '' };
+      const p = { firstName: u.firstName || '', lastName: u.lastName || '', email: u.email || '', phone: u.phone || '', createdAt: u.createdAt || '' };
       setProfile(p);
-      setProfileDraft(p);
+      setProfileDraft({ firstName: p.firstName, lastName: p.lastName, email: p.email, phone: p.phone });
     }).catch(() => {});
   }, []);
+
+  const handlePasswordChange = async () => {
+    if (!security.currentPassword || !security.newPassword) {
+      toast.error('Please fill in all password fields');
+      return;
+    }
+    if (security.newPassword !== security.confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+    if (security.newPassword.length < 8) {
+      toast.error('Password must be at least 8 characters');
+      return;
+    }
+    try {
+      await api.patch('/users/me/password', {
+        currentPassword: security.currentPassword,
+        newPassword: security.newPassword,
+      });
+      toast.success('Password updated successfully');
+      setSecurity({ ...security, currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to update password');
+    }
+  };
 
   // Notification state
   const [notifications, setNotifications] = useState({
@@ -115,7 +141,7 @@ export default function SettingsPage() {
   const handleSaveProfile = async () => {
     try {
       await api.patch('/users/me', { firstName: profileDraft.firstName, lastName: profileDraft.lastName, phone: profileDraft.phone });
-      setProfile({ ...profileDraft });
+      setProfile({ ...profileDraft, createdAt: profile.createdAt });
       setEditingProfile(false);
       toast.success('Profile updated');
     } catch {
@@ -247,7 +273,7 @@ export default function SettingsPage() {
                         <div>
                           <p className="text-sm font-bold text-slate-900 dark:text-white">{profile.firstName} {profile.lastName}</p>
                           <p className="text-xs text-slate-500">{profile.email}</p>
-                          <p className="text-xs text-slate-400 mt-0.5">Member since Jan 2024</p>
+                          <p className="text-xs text-slate-400 mt-0.5">Member since {profile.createdAt ? new Date(profile.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : 'N/A'}</p>
                         </div>
                       </div>
 
@@ -461,7 +487,7 @@ export default function SettingsPage() {
                               <p className="text-[10px] text-red-500 mt-1">Passwords do not match</p>
                             )}
                           </div>
-                          <button className="btn-primary !py-2 !px-4 text-sm w-full sm:w-auto">
+                          <button onClick={handlePasswordChange} className="btn-primary !py-2 !px-4 text-sm w-full sm:w-auto">
                             Update Password
                           </button>
                         </div>

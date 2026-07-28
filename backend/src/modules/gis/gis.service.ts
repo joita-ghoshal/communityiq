@@ -68,7 +68,7 @@ export class GisService {
   async getHeatmapData(city?: string, category?: string) {
     const qb = this.issueRepo
       .createQueryBuilder('issue')
-      .select(`ST_Y(issue.location) as lat, ST_X(issue.location) as lng`)
+      .select(`ST_Y(issue.location::geometry) as lat, ST_X(issue.location::geometry) as lng`)
       .addSelect('COUNT(*) as weight')
       .where('issue.location IS NOT NULL');
 
@@ -91,7 +91,7 @@ export class GisService {
     const qb = this.issueRepo
       .createQueryBuilder('issue')
       .select(`
-        ST_Y(issue.location) as lat, ST_X(issue.location) as lng,
+        ST_Y(issue.location::geometry) as lat, ST_X(issue.location::geometry) as lng,
         issue.category as category
       `)
       .addSelect('AVG(issue.riskScore) as avgRisk')

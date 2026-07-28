@@ -9,6 +9,14 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 export class VolunteersController {
   constructor(private readonly volunteersService: VolunteersService) {}
 
+  @Get()
+  @ApiOperation({ summary: 'Get all volunteers' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async findAll(@Query('page') page = 1, @Query('limit') limit = 20) {
+    return this.volunteersService.findAll(page, limit);
+  }
+
   @Get('profile')
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth('access-token')

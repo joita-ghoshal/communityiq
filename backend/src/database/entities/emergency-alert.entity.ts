@@ -11,7 +11,16 @@ export enum AlertType {
   PUBLIC_HEALTH = 'public_health',
   SAFETY_HAZARD = 'safety_hazard',
   WEATHER = 'weather',
+  STORM = 'storm',
+  FLOOD = 'flood',
+  FIRE = 'fire',
+  EARTHQUAKE = 'earthquake',
+  CHEMICAL = 'chemical',
+  POWER_OUTAGE = 'power_outage',
+  WATER_SUPPLY = 'water_supply',
   CIVIL_EMERGENCY = 'civil_emergency',
+  SECURITY = 'security',
+  OTHER = 'other',
 }
 
 export enum AlertSeverity {

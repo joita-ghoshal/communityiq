@@ -174,4 +174,44 @@ export class CommunityService {
     if (points >= 30) return HeroLevel.CONTRIBUTOR;
     return HeroLevel.NEWCOMER;
   }
+
+  async getFeed(limit: number, page: number) {
+    const [comments, total] = await this.commentRepo.findAndCount({
+      relations: ['user'],
+      order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    const [verifications, vTotal] = await this.verificationRepo.findAndCount({
+      relations: ['user'],
+      order: { votedAt: 'DESC' },
+      skip: (page - 1) * limit,
+      take: limit,
+    });
+
+    const feedItems = [
+      ...comments.map((c) => ({
+        type: 'comment',
+        id: c.id,
+        issueId: c.issueId,
+        userName: c.user ? `${c.user.firstName} ${c.user.lastName}` : 'Unknown',
+        content: c.content?.substring(0, 100),
+        createdAt: c.createdAt,
+      })),
+      ...verifications.map((v) => ({
+        type: 'verification',
+        id: v.id,
+        issueId: v.issueId,
+        userName: v.user ? `${v.user.firstName} ${v.user.lastName}` : 'Unknown',
+        isVerified: v.isVerified,
+        createdAt: v.votedAt,
+      })),
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return {
+      data: feedItems.slice(0, limit),
+      meta: { total: total + vTotal, page, limit, totalPages: Math.ceil((total + vTotal) / limit) },
+    };
+  }
 }

@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   UserCircleIcon, EnvelopeIcon, PhoneIcon, CalendarDaysIcon,
@@ -22,6 +22,18 @@ export default function ProfilePage() {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [contributionStats, setContributionStats] = useState({ reports: 0, verified: 0, points: 0 });
+
+  useEffect(() => {
+    api.get('/users/me/stats').then(({ data }) => {
+      const s = data?.data || data;
+      setContributionStats({
+        reports: s.reports || s.totalReports || 0,
+        verified: s.verified || s.verifiedReports || 0,
+        points: s.points || s.totalPoints || 0,
+      });
+    }).catch(() => {});
+  }, []);
   const [passwordStep, setPasswordStep] = useState(1);
   const [otpEmail, setOtpEmail] = useState('');
   const [otpCode, setOtpCode] = useState('');
@@ -176,8 +188,8 @@ export default function ProfilePage() {
                 {[
                   { icon: EnvelopeIcon, label: 'Email', value: user.email || '-' },
                   { icon: PhoneIcon, label: 'Phone', value: user.phone || '-' },
-                  { icon: MapPinIcon, label: 'Location', value: 'New Delhi, India' },
-                  { icon: CalendarDaysIcon, label: 'Joined', value: 'January 2024' },
+                  { icon: MapPinIcon, label: 'Location', value: (user as any).city || (user as any).location || '-' },
+                  { icon: CalendarDaysIcon, label: 'Joined', value: user.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : '-' },
                 ].map((item) => (
                   <div key={item.label} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
                     <item.icon className="w-5 h-5 text-teal-500 flex-shrink-0" />
@@ -350,11 +362,11 @@ export default function ProfilePage() {
               <div className="glass-card p-6">
                 <h3 className="text-lg font-bold font-heading text-slate-900 dark:text-white mb-4">Contributions</h3>
                 <div className="grid grid-cols-3 gap-3">
-                  {[
-                    { label: 'Reports', value: '24', icon: '📝' },
-                    { label: 'Verified', value: '18', icon: '✅' },
-                    { label: 'Points', value: '1,240', icon: '⭐' },
-                  ].map((stat) => (
+                {[
+                  { label: 'Reports', value: String(contributionStats.reports), icon: '📝' },
+                  { label: 'Verified', value: String(contributionStats.verified), icon: '✅' },
+                  { label: 'Points', value: contributionStats.points.toLocaleString(), icon: '⭐' },
+                ].map((stat) => (
                     <div key={stat.label} className="text-center p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50">
                       <span className="text-2xl">{stat.icon}</span>
                       <p className="text-lg font-bold text-slate-900 dark:text-white mt-1">{stat.value}</p>
