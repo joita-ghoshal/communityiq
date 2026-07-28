@@ -36,13 +36,13 @@ export class GisService {
     const clusters = await this.issueRepo
       .createQueryBuilder('issue')
       .select(`
-        ROUND(CAST(ST_X(ST_Centroid(issue.location)) AS NUMERIC), ${gridSize}) as lng,
-        ROUND(CAST(ST_Y(ST_Centroid(issue.location)) AS NUMERIC), ${gridSize}) as lat
+        ROUND(CAST(ST_X(ST_Centroid(issue.location::geometry)) AS NUMERIC), ${gridSize}) as lng,
+        ROUND(CAST(ST_Y(ST_Centroid(issue.location::geometry)) AS NUMERIC), ${gridSize}) as lat
       `)
       .addSelect('COUNT(*)', 'count')
       .addSelect('AVG(issue.riskScore)', 'avgRisk')
       .addSelect('AVG(issue.communityScore)', 'avgCommunityScore')
-      .where(`ST_Within(issue.location, ST_MakeEnvelope(:swLng, :swLat, :neLng, :neLat, 4326))`)
+      .where(`ST_Within(issue.location::geometry, ST_MakeEnvelope(:swLng, :swLat, :neLng, :neLat, 4326))`)
       .setParameter('swLat', swLat)
       .setParameter('swLng', swLng)
       .setParameter('neLat', neLat)
