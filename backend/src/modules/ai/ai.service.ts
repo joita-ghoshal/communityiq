@@ -742,6 +742,34 @@ Be helpful, concise, and guide users toward taking action. When appropriate, sug
       }
     }
 
+    if (this.geminiApiKey) {
+      try {
+        const contents = messages.map((m) => ({
+          role: m.role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: m.content }],
+        }));
+
+        const resp = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/${this.geminiModel || 'gemini-2.0-flash'}:generateContent?key=${this.geminiApiKey}`,
+          {
+            contents,
+            generationConfig: {
+              temperature: 0.7,
+              maxOutputTokens: 800,
+            },
+          },
+        );
+
+        const content = resp.data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (content) {
+          const suggestions = this.extractSuggestions(message);
+          return { response: content, suggestions };
+        }
+      } catch (e: any) {
+        this.logger.error('Gemini chat error', e.message);
+      }
+    }
+
     return this.mockChatResponse(message);
   }
 

@@ -51,7 +51,8 @@ export default function AIAgentChat() {
     try {
       const history = messages.slice(1).map((m) => ({ role: m.role, content: m.content }));
       const { data } = await api.post('/ai/chat', { message, history });
-      const reply = data?.data?.reply || data?.reply || data?.message || data?.content || '';
+      const result = data?.data || data;
+      const reply = result?.response || result?.reply || result?.message || result?.content || '';
       setMessages((prev) => [...prev, { role: 'assistant', content: reply }]);
     } catch {
       const mockResponses = [

@@ -26,7 +26,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const navItems = [
-  { href: "/", icon: LayoutDashboard, labelKey: "nav.dashboard", roles: ["citizen", "volunteer", "department_admin", "municipal_admin", "super_admin"] },
+  { href: "/dashboard", icon: LayoutDashboard, labelKey: "nav.dashboard", roles: ["citizen", "volunteer", "department_admin", "municipal_admin", "super_admin"] },
   { href: "/map", icon: Map, labelKey: "nav.map", roles: ["citizen", "volunteer", "department_admin", "municipal_admin", "super_admin"] },
   { href: "/report", icon: AlertTriangle, labelKey: "nav.report", roles: ["citizen", "volunteer", "department_admin", "municipal_admin", "super_admin"] },
   { href: "/analytics", icon: BarChart3, labelKey: "nav.analytics", roles: ["department_admin", "municipal_admin", "super_admin"] },

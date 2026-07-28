@@ -195,6 +195,7 @@ interface LeafletMapProps {
   center: [number, number];
   issues: MapIssue[];
   onIssueClick: (id: string) => void;
+  userPosition?: [number, number] | null;
 }
 
 const DynamicLeafletMap = dynamic<LeafletMapProps>(
@@ -243,7 +244,25 @@ const DynamicLeafletMap = dynamic<LeafletMapProps>(
       return null;
     }
 
-    function LeafletMapInner({ center, issues, onIssueClick }: LeafletMapProps) {
+    function UserLocationMarker({ position }: { position: [number, number] }) {
+      const userIcon = L.divIcon({
+        html: `<div style="position:relative;width:20px;height:20px;">
+          <div style="position:absolute;inset:0;border-radius:50%;background:rgba(59,130,246,0.25);animation:user-pulse 2s ease-in-out infinite;"></div>
+          <div style="position:absolute;top:4px;left:4px;width:12px;height:12px;border-radius:50%;background:#3b82f6;border:2.5px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>
+          <style>@keyframes user-pulse{0%,100%{transform:scale(1);opacity:0.4}50%{transform:scale(2.2);opacity:0}}</style>
+        </div>`,
+        className: '',
+        iconSize: [20, 20],
+        iconAnchor: [10, 10],
+      });
+      return (
+        <Marker position={position} icon={userIcon}>
+          <Popup><div className="p-1"><p className="text-xs font-semibold text-blue-700">Your Location</p></div></Popup>
+        </Marker>
+      );
+    }
+
+    function LeafletMapInner({ center, issues, onIssueClick, userPosition }: LeafletMapProps) {
       return (
         <MapContainer
           center={center}
@@ -258,6 +277,7 @@ const DynamicLeafletMap = dynamic<LeafletMapProps>(
           <RecenterMap center={center} />
           <LocateButton />
           <MapEventsHandler onIssueClick={() => onIssueClick('')} />
+          {userPosition && <UserLocationMarker position={userPosition} />}
           {issues.map((issue) => (
             <Marker
               key={issue.id}
@@ -314,12 +334,27 @@ export default function MapPage() {
   const [transitioning, setTransitioning] = useState(false);
   const [showTransitionMenu, setShowTransitionMenu] = useState(false);
 
+  const [userPosition, setUserPosition] = useState<[number, number] | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+
   useEffect(() => {
-    navigator.geolocation.getCurrentPosition(
-      (pos) => setMapCenter([pos.coords.latitude, pos.coords.longitude]),
-      () => {},
-      { enableHighAccuracy: true, timeout: 5000 }
+    if (!('geolocation' in navigator)) {
+      setLocationError('Geolocation not supported');
+      return;
+    }
+    const watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        const newPos: [number, number] = [pos.coords.latitude, pos.coords.longitude];
+        setUserPosition(newPos);
+        setMapCenter(newPos);
+        setLocationError(null);
+      },
+      (err) => {
+        setLocationError(err.code === 1 ? 'Location permission denied' : 'Unable to get location');
+      },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
     );
+    return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
   useEffect(() => {
@@ -393,6 +428,45 @@ export default function MapPage() {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    const interval = setInterval(async () => {
+      try {
+        const { data } = await api.get('/issues', { params: { page: 1, limit: 500 } });
+        const raw = data?.data?.data || data?.data || data || [];
+        if (Array.isArray(raw)) {
+          const list: MapIssue[] = raw.map((item: any) => {
+            let lat = 0, lng = 0;
+            if (item.location) {
+              if (item.location.type === 'Point' && Array.isArray(item.location.coordinates)) {
+                lng = item.location.coordinates[0]; lat = item.location.coordinates[1];
+              } else if (item.location.latitude != null) {
+                lat = item.location.latitude; lng = item.location.longitude;
+              }
+            }
+            if (item.lat != null) lat = item.lat;
+            if (item.lng != null) lng = item.lng;
+            if (item.latitude != null) lat = item.latitude;
+            if (item.longitude != null) lng = item.longitude;
+            return {
+              id: String(item.id ?? item._id ?? ''), title: item.title ?? 'Untitled',
+              description: item.description ?? '', category: item.category ?? 'road_damage',
+              status: item.status ?? 'reported', priority: item.priority ?? 'medium',
+              lat, lng, address: item.address, city: item.city,
+              reporter: typeof item.reportedBy === 'object' ? (item.reportedBy?.name ?? '') : (item.reporter ?? ''),
+              createdAt: item.createdAt,
+              completionPercentage: item.completionPercentage ?? 0,
+              riskScore: item.riskScore ?? 0,
+              assignedTeam: item.assignedTeam, assignedDepartment: item.assignedDepartment,
+              reportedBy: item.reportedBy && typeof item.reportedBy === 'object' ? item.reportedBy : undefined,
+            };
+          });
+          setIssues(list);
+        }
+      } catch { /* silent */ }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   const filteredIssues = issues.filter((issue) => {
     if (!statusMatchesFilter(issue.status, activeStatusFilter)) return false;
     if (activeCategory !== 'All' && issue.category !== catToInternal[activeCategory]) return false;
@@ -444,6 +518,19 @@ export default function MapPage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
+                {userPosition ? (
+                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2.5 py-1 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> GPS Active
+                  </span>
+                ) : locationError ? (
+                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2.5 py-1 rounded-full">
+                    {locationError}
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse" /> Acquiring GPS...
+                  </span>
+                )}
                 <button onClick={() => setViewMode('map')} className={`p-2 rounded-lg transition-colors ${viewMode === 'map' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
                   <Squares2X2Icon className="w-5 h-5" />
                 </button>
@@ -538,7 +625,7 @@ export default function MapPage() {
                       <div className="text-slate-500 text-sm">Loading map...</div>
                     </div>
                   }>
-                    <DynamicLeafletMap center={mapCenter} issues={filteredIssues} onIssueClick={handlePinClick} />
+                    <DynamicLeafletMap center={mapCenter} issues={filteredIssues} onIssueClick={handlePinClick} userPosition={userPosition} />
                   </Suspense>
                 )}
 
