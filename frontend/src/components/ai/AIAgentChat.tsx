@@ -1,16 +1,65 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence, useMotionValue } from 'framer-motion';
 import { SparklesIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/outline';
 import { useAiChat } from '@/hooks/useAiChat';
 import ChatPanel from '@/components/ai/ChatPanel';
 import ChatComposer from '@/components/ai/ChatComposer';
+
+const FAB_KEY = 'fmc-ai-fab-pos';
+const FAB_SIZE = 60;
+const FAB_MARGIN = 20;
+const DRAG_THRESHOLD = 6;
 
 export default function AIAgentChat() {
   const [isOpen, setIsOpen] = useState(false);
   const [minimized, setMinimized] = useState(false);
   const [unread, setUnread] = useState(false);
   const [snappedSide, setSnappedSide] = useState<'left' | 'right'>('right');
+
+  const fabRef = useRef<HTMLDivElement>(null);
+  const fabX = useMotionValue(0);
+  const fabY = useMotionValue(0);
+  const basePos = useRef({ x: 0, y: 0 });
+  const dragSession = useRef<{ startX: number; startY: number; moved: boolean } | null>(null);
+
+  const clampPos = useCallback((p: { x: number; y: number }) => {
+    const vw = typeof window !== 'undefined' ? window.innerWidth : 1024;
+    const vh = typeof window !== 'undefined' ? window.innerHeight : 768;
+    const inset = 3;
+    return {
+      x: Math.min(Math.max(inset, Math.round(p.x)), Math.max(inset, vw - FAB_SIZE - inset)),
+      y: Math.min(Math.max(inset, Math.round(p.y)), Math.max(inset, vh - FAB_SIZE - inset)),
+    };
+  }, []);
+
+  useEffect(() => {
+    let initial = {
+      x: Math.max(0, window.innerWidth - FAB_SIZE - FAB_MARGIN),
+      y: Math.max(0, window.innerHeight - FAB_SIZE - FAB_MARGIN),
+    };
+    try {
+      const raw = localStorage.getItem(FAB_KEY);
+      if (raw) {
+        const p = JSON.parse(raw);
+        if (typeof p?.x === 'number' && typeof p?.y === 'number') initial = clampPos(p);
+      }
+    } catch {
+      /* corrupted storage */
+    }
+    basePos.current = initial;
+    fabX.set(initial.x);
+    fabY.set(initial.y);
+
+    const onResize = () => {
+      const c = clampPos({ x: fabX.get(), y: fabY.get() });
+      basePos.current = c;
+      fabX.set(c.x);
+      fabY.set(c.y);
+    };
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, [clampPos, fabX, fabY]);
 
   const {
     activeId,
@@ -57,9 +106,62 @@ export default function AIAgentChat() {
 
   const handleClose = () => setIsOpen(false);
 
-  const handleDragEnd = (_: any, info: { point: { x: number } }) => {
-    const windowWidth = typeof window !== 'undefined' ? window.innerWidth : 1000;
-    setSnappedSide(info.point.x < windowWidth / 2 ? 'left' : 'right');
+  const handlePointerDown = (e: React.PointerEvent) => {
+    basePos.current = { x: fabX.get(), y: fabY.get() };
+    dragSession.current = { startX: e.clientX, startY: e.clientY, moved: false };
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      /* capture not supported */
+    }
+  };
+
+  const handlePointerMove = (e: React.PointerEvent) => {
+    const s = dragSession.current;
+    if (!s) return;
+    const dx = e.clientX - s.startX;
+    const dy = e.clientY - s.startY;
+    if (!s.moved && Math.hypot(dx, dy) < DRAG_THRESHOLD) return;
+    s.moved = true;
+    const c = clampPos({ x: basePos.current.x + dx, y: basePos.current.y + dy });
+    fabX.set(c.x);
+    fabY.set(c.y);
+  };
+
+  const handlePointerUp = (e: React.PointerEvent) => {
+    const s = dragSession.current;
+    dragSession.current = null;
+    if (!s) return;
+    try {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    } catch {
+      /* no capture */
+    }
+    if (!s.moved) {
+      handleOpen();
+      return;
+    }
+    const c = clampPos({ x: basePos.current.x + (e.clientX - s.startX), y: basePos.current.y + (e.clientY - s.startY) });
+    basePos.current = c;
+    fabX.set(c.x);
+    fabY.set(c.y);
+    try {
+      localStorage.setItem(FAB_KEY, JSON.stringify(c));
+    } catch {
+      /* storage unavailable */
+    }
+    setSnappedSide(e.clientX < window.innerWidth / 2 ? 'left' : 'right');
+  };
+
+  const handlePointerCancel = () => {
+    dragSession.current = null;
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleOpen();
+    }
   };
 
   const isStreaming = status === 'streaming';
@@ -68,17 +170,23 @@ export default function AIAgentChat() {
     <>
       {!isOpen && (
         <motion.div
-          drag
-          dragMomentum={false}
-          dragElastic={0.1}
-          onDragEnd={handleDragEnd}
-          onClick={handleOpen}
-          className="fixed bottom-5 right-5 z-[9999] cursor-grab active:cursor-grabbing select-none"
+          ref={fabRef}
+          role="button"
+          tabIndex={0}
+          aria-label="Open AI assistant"
+          style={{ x: fabX, y: fabY }}
+          onPointerDown={handlePointerDown}
+          onPointerMove={handlePointerMove}
+          onPointerUp={handlePointerUp}
+          onPointerCancel={handlePointerCancel}
+          onKeyDown={handleKeyDown}
+          className="fixed left-0 top-0 z-[9999] cursor-grab active:cursor-grabbing select-none touch-none"
           whileHover={{ scale: 1.08 }}
           whileTap={{ scale: 0.95 }}
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+          draggable={false}
         >
           <div className="w-[60px] h-[60px] rounded-full bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center shadow-2xl relative">
             <div className="absolute inset-0 rounded-full animate-pulse-glow" />
@@ -120,6 +228,7 @@ export default function AIAgentChat() {
                     }}
                     className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"
                     title="Clear conversation"
+                    aria-label="Clear conversation"
                   >
                     <TrashIcon className="w-3.5 h-3.5" />
                   </button>
@@ -129,6 +238,7 @@ export default function AIAgentChat() {
                     }}
                     className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors"
                     title={minimized ? 'Maximize' : 'Minimize'}
+                    aria-label={minimized ? 'Maximize chat' : 'Minimize'}
                   >
                     {minimized ? (
                       <PlusIcon className="w-3.5 h-3.5 rotate-45" />
@@ -138,7 +248,7 @@ export default function AIAgentChat() {
                       </svg>
                     )}
                   </button>
-                  <button onClick={handleClose} className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors" title="Close">
+                  <button onClick={handleClose} className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition-colors" title="Close" aria-label="Close chat">
                     <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                     </svg>
