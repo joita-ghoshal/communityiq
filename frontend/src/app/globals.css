@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Poppins:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -472,3 +472,261 @@
 .page-enter {
   animation: fadeSlideUp 0.3s ease-out;
 }
+
+/* ============================================================
+   AI ASSISTANT — PREMIUM ENTERPRISE WORKSPACE
+   ============================================================ */
+
+.font-display {
+  font-family: 'Manrope', 'Poppins', 'Inter', system-ui, sans-serif;
+}
+
+/* Workspace backdrop: layered radial glows over a deep navy / azure gradient */
+.ai-workspace {
+  position: relative;
+  background:
+    radial-gradient(1100px 560px at 82% -12%, rgba(56, 189, 248, 0.16), transparent 60%),
+    radial-gradient(900px 480px at -8% 28%, rgba(99, 102, 241, 0.15), transparent 60%),
+    radial-gradient(760px 560px at 62% 112%, rgba(139, 92, 246, 0.13), transparent 62%),
+    linear-gradient(180deg, #0b1220 0%, #0d1526 45%, #0f1b2e 100%);
+}
+html:not(.dark) .ai-workspace {
+  background:
+    radial-gradient(1100px 560px at 82% -12%, rgba(56, 189, 248, 0.22), transparent 60%),
+    radial-gradient(900px 480px at -8% 28%, rgba(99, 102, 241, 0.18), transparent 60%),
+    radial-gradient(760px 560px at 62% 112%, rgba(139, 92, 246, 0.16), transparent 62%),
+    linear-gradient(180deg, #eaf4ff 0%, #e8f0ff 45%, #e6effd 100%);
+}
+
+/* Floating glow blobs */
+.ai-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(70px);
+  opacity: 0.55;
+  pointer-events: none;
+  animation: blob-drift 18s ease-in-out infinite;
+}
+
+/* Faint engineering grid, faded at the bottom */
+.ai-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.07) 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 25%, transparent 78%);
+  mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 25%, transparent 78%);
+}
+
+/* Glass panels */
+.ai-panel {
+  background: rgba(255, 255, 255, 0.68);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(22px) saturate(170%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+.dark .ai-panel {
+  background: rgba(13, 21, 38, 0.68);
+  border-color: rgba(148, 163, 184, 0.13);
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* AI response cards: soft translucent panel with a subtle top sheen */
+.ai-card {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+}
+.dark .ai-card {
+  background: rgba(16, 26, 44, 0.62);
+  border-color: rgba(148, 163, 184, 0.14);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* Gradient text used for hero headings */
+.ai-gradient-text {
+  background: linear-gradient(120deg, #0ea5e9 0%, #6366f1 45%, #8b5cf6 90%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradient-x 7s ease infinite;
+}
+.dark .ai-gradient-text {
+  background: linear-gradient(120deg, #38bdf8 0%, #818cf8 45%, #a78bfa 90%);
+  background-size: 200% 200%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: gradient-x 7s ease infinite;
+}
+
+/* Streaming caret */
+.streaming-caret {
+  display: inline-block;
+  width: 8px;
+  height: 1.05em;
+  margin-left: 2px;
+  border-radius: 2px;
+  vertical-align: text-bottom;
+  background: linear-gradient(180deg, #38bdf8, #818cf8);
+  animation: caret-blink 0.9s step-end infinite;
+}
+
+/* Typing indicator dots */
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 9999px;
+  background: linear-gradient(180deg, #38bdf8, #818cf8);
+  animation: typing-bounce 1.2s ease-in-out infinite;
+}
+
+/* Markdown typography inside AI cards */
+.ai-markdown {
+  font-size: 0.875rem;
+  line-height: 1.75;
+  word-break: break-word;
+}
+.ai-markdown > :first-child { margin-top: 0; }
+.ai-markdown > :last-child { margin-bottom: 0; }
+.ai-markdown p { margin: 0.55rem 0; }
+.ai-markdown h1, .ai-markdown h2, .ai-markdown h3, .ai-markdown h4 {
+  font-family: 'Poppins', system-ui, sans-serif;
+  font-weight: 700;
+  margin: 1.1rem 0 0.5rem;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+.ai-markdown h1 { font-size: 1.05rem; }
+.ai-markdown h2 { font-size: 1rem; }
+.ai-markdown h3 { font-size: 0.925rem; }
+.ai-markdown h4 { font-size: 0.875rem; }
+.ai-markdown ul { list-style: disc; padding-left: 1.25rem; margin: 0.55rem 0; }
+.ai-markdown ol { list-style: decimal; padding-left: 1.25rem; margin: 0.55rem 0; }
+.ai-markdown li { margin: 0.3rem 0; }
+.ai-markdown li::marker { color: #818cf8; }
+.ai-markdown a {
+  color: #0284c7;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.dark .ai-markdown a { color: #38bdf8; }
+.ai-markdown blockquote {
+  border-left: 3px solid;
+  border-image: linear-gradient(180deg, #38bdf8, #818cf8) 1;
+  padding: 0.4rem 0.9rem;
+  margin: 0.7rem 0;
+  border-radius: 0 0.6rem 0.6rem 0;
+  font-style: italic;
+  background: rgba(99, 102, 241, 0.06);
+}
+.ai-markdown hr {
+  border: none;
+  height: 1px;
+  margin: 1rem 0;
+  background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.35), transparent);
+}
+.ai-markdown table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.78rem;
+  margin: 0.75rem 0;
+  overflow: hidden;
+  border-radius: 0.7rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+.ai-markdown th {
+  text-align: left;
+  font-weight: 700;
+  padding: 0.45rem 0.75rem;
+  background: rgba(56, 189, 248, 0.09);
+}
+.ai-markdown td {
+  padding: 0.45rem 0.75rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.16);
+}
+.ai-markdown code:not(pre code) {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78em;
+  padding: 0.15em 0.45em;
+  border-radius: 0.45rem;
+  background: rgba(59, 130, 246, 0.12);
+  color: #0369a1;
+}
+.dark .ai-markdown code:not(pre code) {
+  background: rgba(99, 102, 241, 0.18);
+  color: #93c5fd;
+}
+.ai-markdown pre {
+  margin: 0.75rem 0;
+  border-radius: 0.85rem;
+  overflow: hidden;
+  background: #0b1220;
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+.ai-markdown pre code {
+  display: block;
+  overflow-x: auto;
+  padding: 0.85rem 1rem;
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+  line-height: 1.65;
+  color: #e2e8f0;
+}
+
+/* Syntax highlighting (scoped to AI markdown) */
+.ai-markdown .hljs-comment, .ai-markdown .hljs-quote { color: #64748b; font-style: italic; }
+.ai-markdown .hljs-keyword, .ai-markdown .hljs-selector-tag, .ai-markdown .hljs-meta { color: #c084fc; }
+.ai-markdown .hljs-string, .ai-markdown .hljs-regexp, .ai-markdown .hljs-addition { color: #86efac; }
+.ai-markdown .hljs-number, .ai-markdown .hljs-literal { color: #fda4af; }
+.ai-markdown .hljs-title, .ai-markdown .hljs-title.function_, .ai-markdown .hljs-section { color: #93c5fd; }
+.ai-markdown .hljs-attr, .ai-markdown .hljs-attribute, .ai-markdown .hljs-variable { color: #7dd3fc; }
+.ai-markdown .hljs-built_in, .ai-markdown .hljs-type { color: #fbbf24; }
+.ai-markdown .hljs-symbol, .ai-markdown .hljs-bullet { color: #94a3b8; }
+.ai-markdown .hljs-deletion { color: #f87171; }
+.ai-markdown .hljs-emphasis { font-style: italic; }
+.ai-markdown .hljs-strong { font-weight: 700; }
+
+/* Keyframes for the AI workspace */
+@keyframes blob-drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(36px, -24px) scale(1.12); }
+  66% { transform: translate(-24px, 18px) scale(0.94); }
+}
+@keyframes caret-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.35; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+@keyframes gradient-x {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* Conversation sidebar scrollbar */
+.ai-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.22) transparent;
+}
+.ai-scrollbar::-webkit-scrollbar { width: 5px; }
+.ai-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.ai-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(148, 163, 184, 0.22);
+  border-radius: 20px;
+}
+
+/* Legacy markdown wrapper fix (was referenced but never defined) */
+.markdown-body { font-size: 0.875rem; line-height: 1.7; word-break: break-word; }
+.markdown-li { margin: 0.25rem 0; }
