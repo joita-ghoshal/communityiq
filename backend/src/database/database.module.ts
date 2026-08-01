@@ -13,6 +13,8 @@ import { IssueTimeline } from './entities/issue-timeline.entity';
 import { Comment } from './entities/comment.entity';
 import { LeaveRequest } from './entities/leave-request.entity';
 import { AuditLog } from './entities/audit-log.entity';
+import { AiConversation } from './entities/ai-conversation.entity';
+import { AiMessage } from './entities/ai-message.entity';
 
 const entities = [
   User,
@@ -27,6 +29,8 @@ const entities = [
   Comment,
   LeaveRequest,
   AuditLog,
+  AiConversation,
+  AiMessage,
 ];
 
 @Global()

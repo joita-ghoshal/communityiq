@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { firstValueFrom } from 'rxjs';
 import axios from 'axios';
 import { Issue, IssueCategory, IssuePriority, IssueStatus } from '../../database/entities/issue.entity';
+import { AiEngineService } from './ai-engine.service';
 
 @Injectable()
 export class AiService {
@@ -20,6 +21,7 @@ export class AiService {
     private readonly httpService: HttpService,
     @InjectRepository(Issue)
     private readonly issueRepository: Repository<Issue>,
+    private readonly engine: AiEngineService,
   ) {
     this.geminiApiKey = this.configService.get<string>('GEMINI_API_KEY', '');
     this.geminiModel = this.configService.get<string>('GEMINI_MODEL', 'gemini-pro');
@@ -500,26 +502,16 @@ Provide 3-5 insights covering trends, patterns, and recommendations.`;
   }
 
   private async callAI(prompt: string): Promise<string | null> {
-    if (this.openaiApiKey) {
-      try {
-        const resp = await axios.post(
-          'https://api.openai.com/v1/chat/completions',
-          { model: this.openaiModel, messages: [{ role: 'user', content: prompt }], temperature: 0.3, max_tokens: 500 },
-          { headers: { Authorization: `Bearer ${this.openaiApiKey}`, 'Content-Type': 'application/json' } },
-        );
-        return resp.data.choices[0].message.content;
-      } catch (e: any) { this.logger.error('OpenAI error', e.message); }
+    try {
+      const result = await this.engine.generate(
+        [{ role: 'user', content: prompt }],
+        { temperature: 0.3, maxTokens: 500 },
+      );
+      return result.content;
+    } catch (e: any) {
+      this.logger.error(`Unified AI engine unavailable: ${e.message}`);
+      return null;
     }
-    if (this.geminiApiKey) {
-      try {
-        const resp = await axios.post(
-          `https://generativelanguage.googleapis.com/v1beta/models/${this.geminiModel}:generateContent?key=${this.geminiApiKey}`,
-          { contents: [{ parts: [{ text: prompt }] }], generationConfig: { temperature: 0.3, maxOutputTokens: 500 } },
-        );
-        return resp.data.candidates?.[0]?.content?.parts?.[0]?.text || null;
-      } catch (e: any) { this.logger.error('Gemini error', e.message); }
-    }
-    return null;
   }
 
   private async analyzeWithOpenAI(input: string) {
@@ -839,5 +831,50 @@ Be helpful, concise, and guide users toward taking action. When appropriate, sug
       response: 'I can help you with CommunityIQ! Here are some things I can assist with:\n- Reporting civic issues (potholes, water leaks, garbage, etc.)\n- Understanding the issue map\n- Emergency alerts and safety\n- Volunteer opportunities\n- Platform navigation\n\nWhat would you like to know?',
       suggestions: ['Report an issue', 'View the map', 'Check alerts', 'About CommunityIQ'],
     };
+  }
+
+  async transcribeAudio(audioBase64?: string, mimeType?: string): Promise<{ text: string }> {
+    if (!audioBase64) {
+      throw new HttpException('No audio data provided', HttpStatus.BAD_REQUEST);
+    }
+    if (!this.openaiApiKey) {
+      throw new HttpException(
+        'Server-side speech-to-text is not configured. Your browser can transcribe voice locally (Web Speech API).',
+        HttpStatus.NOT_IMPLEMENTED,
+      );
+    }
+    try {
+      const form = new FormData();
+      const mime = mimeType || 'audio/webm';
+      const ext = mime.includes('mp3') ? 'mp3' : mime.includes('wav') ? 'wav' : 'webm';
+      const buffer = Buffer.from(audioBase64, 'base64');
+      form.append('file', new Blob([buffer], { type: mime }) as any, `voice.${ext}`);
+      form.append('model', 'whisper-1');
+      const resp = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${this.openaiApiKey}` },
+        body: form,
+      });
+      if (!resp.ok) {
+        const body = await resp.text().catch(() => '');
+        throw new HttpException(`Whisper transcription failed (${resp.status})`, HttpStatus.BAD_GATEWAY);
+      }
+      const data: any = await resp.json();
+      return { text: data.text || '' };
+    } catch (e: any) {
+      if (e instanceof HttpException) throw e;
+      this.logger.error(`transcribeAudio: ${e.message}`);
+      throw new HttpException('Transcription service unavailable', HttpStatus.BAD_GATEWAY);
+    }
+  }
+
+  async synthesizeSpeech(text: string): Promise<Buffer> {
+    if (!text) {
+      throw new HttpException('No text provided', HttpStatus.BAD_REQUEST);
+    }
+    throw new HttpException(
+      'Server-side text-to-speech is not configured. Your browser can speak responses locally (Web Speech API).',
+      HttpStatus.NOT_IMPLEMENTED,
+    );
   }
 }

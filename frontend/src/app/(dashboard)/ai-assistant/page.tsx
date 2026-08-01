@@ -1,220 +1,123 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
-  SparklesIcon, PaperAirplaneIcon, LightBulbIcon, MapPinIcon,
-  ExclamationTriangleIcon, ChartBarIcon, ChatBubbleLeftRightIcon,
-  MagnifyingGlassIcon, BellIcon, ArrowPathIcon,
-} from '@heroicons/react/24/outline';
+import { useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { SparklesIcon, TrashIcon, ChatBubbleLeftRightIcon } from '@heroicons/react/24/outline';
 import AppShell from '@/components/layout/AppShell';
 import { pageThemes } from '@/lib/theme/page-themes';
-import api from '@/lib/api';
-
-interface Message {
-  id: string;
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-  type?: 'text' | 'suggestion' | 'alert';
-}
-
-const suggestions = [
-  { icon: MagnifyingGlassIcon, text: 'Show me issues near my location', color: 'from-blue-500 to-indigo-600' },
-  { icon: ExclamationTriangleIcon, text: 'What are the top priority issues today?', color: 'from-red-500 to-rose-600' },
-  { icon: ChartBarIcon, text: 'Generate department performance report', color: 'from-emerald-500 to-green-600' },
-  { icon: BellIcon, text: 'Any emergency alerts in my area?', color: 'from-amber-500 to-orange-600' },
-];
-
-const initialMessages: Message[] = [
-  {
-    id: '1',
-    role: 'assistant',
-    content: "Hello! I'm your AI Civic Intelligence Assistant. I can help you:\n\n🔍 Search and track nearby issues\n📊 Analyze community trends\n🚨 Check emergency alerts\n📋 Report new problems\n🗺️ Navigate the platform\n\nHow can I assist you today?",
-    timestamp: new Date(),
-    type: 'text',
-  },
-];
+import { useAiChat } from '@/hooks/useAiChat';
+import ChatPanel from '@/components/ai/ChatPanel';
+import ChatComposer from '@/components/ai/ChatComposer';
+import ConversationSidebar from '@/components/ai/ConversationSidebar';
 
 export default function AIAssistantPage() {
   const theme = pageThemes.ai_assistant;
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
-  const [input, setInput] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [apiError, setApiError] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const {
+    conversations,
+    activeId,
+    messages,
+    status,
+    error,
+    streamingText,
+    send,
+    regenerate,
+    retry,
+    newChat,
+    deleteConversation,
+    loadConversation,
+  } = useAiChat({ autoLoadLatest: true });
+
+  const locationRef = useRef<{ lat: number; lng: number } | null>(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+    if (!('geolocation' in navigator)) return;
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        locationRef.current = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      },
+      () => {},
+      { enableHighAccuracy: false, timeout: 15000, maximumAge: 120000 },
+    );
+    return () => navigator.geolocation.clearWatch(id);
+  }, []);
 
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, [isTyping]);
-
-  const handleSend = async (text?: string) => {
-    const content = text || input.trim();
-    if (!content || isTyping) return;
-
-    const userMsg: Message = { id: Date.now().toString(), role: 'user', content, timestamp: new Date() };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput('');
-    setIsTyping(true);
-    setApiError(false);
-
-    try {
-      const conversationHistory = messages
-        .filter((m) => m.id !== '1')
-        .map((m) => ({ role: m.role, content: m.content }));
-
-      const { data } = await api.post('/ai/chat', {
-        message: content,
-        history: conversationHistory,
-      });
-
-      const result = data.data || data;
-      const aiMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: result.response || result.message || 'I received your message but could not generate a response.',
-        timestamp: new Date(),
-        type: 'text',
-      };
-      setMessages((prev) => [...prev, aiMsg]);
-    } catch (err: any) {
-      setApiError(true);
-      const errorMsg = err?.response?.status === 401
-        ? 'Authentication expired. Please refresh the page.'
-        : err?.response?.status >= 500
-          ? 'AI service is temporarily unavailable. Please try again in a moment.'
-          : 'Unable to reach the AI assistant. Please check your connection and try again.';
-      const aiMsg: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: `⚠️ ${errorMsg}\n\nYou can:\n- Try sending your message again\n- Visit the Report Issue page to submit directly\n- Check the Map for nearby issues`,
-        timestamp: new Date(),
-        type: 'alert',
-      };
-      setMessages((prev) => [...prev, aiMsg]);
-    } finally {
-      setIsTyping(false);
-    }
-  };
+  const isStreaming = status === 'streaming';
 
   return (
     <AppShell>
-      <div className={`${theme.background} min-h-full flex flex-col h-[calc(100vh-4rem)]`}>
-        {/* Header */}
-        <div className="p-4 md:p-6 pb-3">
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3">
-            <div className={`${theme.gradient} rounded-xl p-2.5 text-white`}>
-              <SparklesIcon className="w-5 h-5" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold font-heading text-slate-900 dark:text-white">AI Assistant</h1>
-              <p className="text-xs text-slate-500">Powered by Civic Intelligence Engine</p>
-            </div>
-            <div className={`ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
-              apiError
-                ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
-                : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
-            }`}>
-              <div className={`w-2 h-2 rounded-full ${apiError ? 'bg-red-500' : 'bg-emerald-500 animate-pulse'}`} />
-              {apiError ? 'Disconnected' : 'Online'}
-            </div>
-          </motion.div>
-        </div>
-
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto scrollbar-thin px-4 md:px-6 py-4 space-y-4">
-          <AnimatePresence>
-            {messages.map((msg) => (
-              <motion.div key={msg.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                <div className={`max-w-[80%] md:max-w-[70%] rounded-2xl px-4 py-3 ${
-                  msg.role === 'user'
-                    ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white'
-                    : msg.type === 'alert'
-                      ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50'
-                      : 'glass-card-strong'
-                }`}>
-                  {msg.role === 'assistant' && (
-                    <div className="flex items-center gap-1.5 mb-2">
-                      <SparklesIcon className="w-3.5 h-3.5 text-purple-500" />
-                      <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400">AI Assistant</span>
-                    </div>
-                  )}
-                  <div className="text-sm whitespace-pre-wrap leading-relaxed">
-                    {msg.content.split('\n').map((line, i) => {
-                      if (line.startsWith('📍') || line.startsWith('📊') || line.startsWith('🚨') || line.startsWith('📝') || line.startsWith('⚠️')) {
-                        return <p key={i} className="font-bold mt-2 mb-1">{line}</p>;
-                      }
-                      if (line.startsWith('- ')) {
-                        return <p key={i} className="ml-2">{'• '}{line.substring(2)}</p>;
-                      }
-                      return <p key={i}>{line}</p>;
-                    })}
-                  </div>
-                  <p className={`text-[10px] mt-2 ${msg.role === 'user' ? 'text-white/60' : 'text-slate-400'}`}>
-                    {msg.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-
-          {isTyping && (
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
-              <div className="glass-card px-4 py-3 rounded-2xl">
-                <div className="flex items-center gap-1.5">
-                  <SparklesIcon className="w-3.5 h-3.5 text-purple-500" />
-                  <span className="text-[10px] font-semibold text-purple-600">AI is thinking</span>
-                </div>
-                <div className="flex gap-1 mt-2">
-                  <div className="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                  <div className="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                  <div className="w-2 h-2 rounded-full bg-purple-400 animate-bounce" style={{ animationDelay: '300ms' }} />
-                </div>
+      <div className={`${theme.background} min-h-full`}>
+        <div className="flex flex-col h-[calc(100vh-4rem)]">
+          <div className="p-4 md:p-5 pb-3">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3">
+              <div className={`${theme.gradient} rounded-xl p-2.5 text-white`}>
+                <SparklesIcon className="w-5 h-5" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold font-heading text-slate-900 dark:text-white">AI Assistant</h1>
+                <p className="text-xs text-slate-500">Unified Civic Intelligence Engine</p>
+              </div>
+              <div
+                className={`ml-auto flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${
+                  status === 'error'
+                    ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                    : 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
+                }`}
+              >
+                <div className={`w-2 h-2 rounded-full ${status === 'error' ? 'bg-red-500' : 'bg-emerald-500 animate-pulse'}`} />
+                {status === 'error' ? 'Needs attention' : 'AI Online'}
               </div>
             </motion.div>
-          )}
-          <div ref={messagesEndRef} />
-        </div>
+          </div>
 
-        {/* Suggestions */}
-        {messages.length <= 1 && (
-          <div className="px-4 md:px-6 pb-2">
-            <div className="grid grid-cols-2 gap-2">
-              {suggestions.map((s, i) => (
-                <motion.button key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 * i }}
-                  onClick={() => handleSend(s.text)}
-                  className="glass-card p-3 text-left hover:shadow-lg transition-all group">
-                  <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${s.color} flex items-center justify-center mb-2 group-hover:scale-110 transition-transform`}>
-                    <s.icon className="w-4 h-4 text-white" />
-                  </div>
-                  <p className="text-xs font-medium text-slate-700 dark:text-slate-300">{s.text}</p>
-                </motion.button>
-              ))}
+          <div className="flex-1 flex min-h-0 mx-4 md:mx-5 mb-4">
+            <div className="hidden md:block h-full">
+              <ConversationSidebar
+                conversations={conversations}
+                activeId={activeId}
+                loading={status === 'loading' && conversations.length === 0}
+                onSelect={(id) => loadConversation(id)}
+                onNew={newChat}
+                onDelete={deleteConversation}
+              />
+            </div>
+            <div className="flex-1 flex flex-col min-w-0 bg-white/70 dark:bg-slate-900/70 backdrop-blur-xl border border-slate-200 dark:border-slate-700 rounded-2xl overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-slate-200 dark:border-slate-700 flex items-center gap-2 bg-white/50 dark:bg-slate-900/50">
+                <ChatBubbleLeftRightIcon className="w-4 h-4 text-sky-500" />
+                <span className="text-xs font-medium text-slate-600 dark:text-slate-300 truncate">
+                  {activeId
+                    ? conversations.find((c) => c.id === activeId)?.title || 'Conversation'
+                    : 'New conversation'}
+                </span>
+                {activeId && (
+                  <button
+                    onClick={() => {
+                      if (window.confirm('Delete this conversation?')) deleteConversation(activeId);
+                    }}
+                    className="ml-auto p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    title="Delete conversation"
+                  >
+                    <TrashIcon className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+              <ChatPanel
+                messages={messages}
+                status={status}
+                error={error}
+                streamingText={streamingText}
+                onSuggestion={(text) => send(text, locationRef.current)}
+                onRetry={() => retry(locationRef.current)}
+                onRegenerate={() => regenerate(locationRef.current)}
+                emptyTitle="How can I help?"
+                emptySubtitle="Ask about issues near you, department status, analytics, emergency guidance or civic services."
+              />
+              <ChatComposer
+                disabled={status === 'loading'}
+                isStreaming={isStreaming}
+                onSend={(text) => send(text, locationRef.current)}
+                placeholder="Ask about issues, departments, analytics, emergencies..."
+              />
             </div>
           </div>
-        )}
-
-        {/* Input */}
-        <div className="p-4 md:px-6 border-t border-slate-200/50 dark:border-slate-700/50 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl">
-          <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="flex items-center gap-3">
-            <input
-              ref={inputRef}
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask me anything about civic issues..."
-              className="input-field flex-1 !py-3"
-              disabled={isTyping}
-            />
-            <button type="submit" disabled={!input.trim() || isTyping}
-              className="w-11 h-11 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white flex items-center justify-center hover:shadow-lg transition-all disabled:opacity-50 flex-shrink-0">
-              {isTyping ? <ArrowPathIcon className="w-5 h-5 animate-spin" /> : <PaperAirplaneIcon className="w-5 h-5" />}
-            </button>
-          </form>
         </div>
       </div>
     </AppShell>
