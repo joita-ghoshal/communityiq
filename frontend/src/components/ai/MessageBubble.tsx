@@ -120,21 +120,21 @@ export default function MessageBubble({ message, isLastAssistant, onRegenerate, 
       </div>
       <div className="min-w-0 flex-1">
         <div className="ai-card overflow-hidden">
-          <div className="flex items-center justify-between gap-2 px-4 pt-2.5 pb-2 border-b border-slate-100 dark:border-slate-800/60">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-xs font-semibold font-display text-slate-700 dark:text-slate-200">
+          <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 px-4 pt-2.5 pb-2 border-b border-slate-100 dark:border-slate-800/60">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold font-display text-slate-700 dark:text-slate-200 flex-shrink-0">
                 FixMyCity AI
               </span>
               {message.provider && (
-                <span className="px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400 text-[10px] font-medium uppercase tracking-wide">
+                <span className="px-1.5 py-0.5 rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400 text-[10px] font-medium uppercase tracking-wide truncate max-w-[45%]">
                   {message.provider}
                 </span>
               )}
-              <span className="text-[10px] text-slate-400 hidden sm:inline" title={formatFullTime(message.createdAt)}>
+              <span className="text-[10px] text-slate-400 hidden sm:inline truncate" title={formatFullTime(message.createdAt)}>
                 {formatFullTime(message.createdAt)}
               </span>
             </div>
-            <div className="flex items-center gap-0.5 flex-shrink-0">
+            <div className="flex items-center gap-0.5 flex-shrink-0 ml-auto">
               <button onClick={copy} className={toolBtn} title="Copy response" aria-label="Copy response">
                 {copied ? <CheckIcon className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
               </button>
