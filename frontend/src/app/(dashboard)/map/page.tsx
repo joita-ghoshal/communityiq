@@ -137,7 +137,6 @@ export default function MapPage() {
   const [userAccuracy, setUserAccuracy] = useState<number | null>(null);
   const [gpsState, setGpsState] = useState<GpsState>('idle');
   const [gpsErrorMsg, setGpsErrorMsg] = useState<string | null>(null);
-  const [gpsRetries, setGpsRetries] = useState(0);
   const [userAddress, setUserAddress] = useState<string | null>(null);
   const watchIdRef = useRef<number | null>(null);
   const watchStartedRef = useRef(false);
@@ -156,6 +155,11 @@ export default function MapPage() {
   const [lastSync, setLastSync] = useState<string | null>(null);
 
   const center: [number, number] = userPosition ?? KOLKATA_CENTER;
+  const centerRef = useRef<[number, number]>(center);
+  centerRef.current = center;
+  const socketRef = useRef(socket);
+  socketRef.current = socket;
+  const retriesRef = useRef(0);
   const lastPosRef = useRef<[number, number] | null>(null);
   const addressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -173,20 +177,30 @@ export default function MapPage() {
 
     watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
-        const newPos: [number, number] = [pos.coords.latitude, pos.coords.longitude];
-        setUserPosition(newPos);
-        setUserAccuracy(pos.coords.accuracy ?? null);
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        retriesRef.current = 0;
         setGpsState('active');
         setGpsErrorMsg(null);
-        setGpsRetries(0);
 
         const prev = lastPosRef.current;
-        if (prev && haversineKm(prev[0], prev[1], newPos[0], newPos[1]) < 0.05) return;
-        lastPosRef.current = newPos;
+        if (prev && haversineKm(prev[0], prev[1], lat, lng) < 0.025) {
+          setUserAccuracy(pos.coords.accuracy ?? null);
+          return;
+        }
+        lastPosRef.current = [lat, lng];
+        setUserPosition([lat, lng]);
+        setUserAccuracy(pos.coords.accuracy ?? null);
+
+        if (!prev) {
+          setFlyTo({ lat, lng, zoom: 15 });
+          loadExploreRef.current(lat, lng);
+        }
+
         if (addressTimerRef.current) clearTimeout(addressTimerRef.current);
         addressTimerRef.current = setTimeout(() => {
           api
-            .get('/gis/reverse-geocode', { params: { lat: newPos[0], lng: newPos[1] } })
+            .get('/gis/reverse-geocode', { params: { lat, lng } })
             .then(({ data }) => {
               const d = data?.data;
               if (d?.address || d?.displayName) {
@@ -197,17 +211,18 @@ export default function MapPage() {
         }, 3000);
       },
       (err) => {
-        setGpsRetries((r) => r + 1);
         if (err.code === 1) {
           setGpsState('denied');
           setGpsErrorMsg('Location permission denied. Enable location access in your browser settings to use live GPS features.');
         } else if (err.code === 3) {
+          retriesRef.current += 1;
           setGpsErrorMsg(err.message || 'Location request timed out. Retrying...');
-          if (gpsRetries >= 3) {
+          if (retriesRef.current > 3 && !lastPosRef.current) {
             setGpsState('error');
             watchStartedRef.current = false;
+            if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
           } else {
-            setGpsState('acquiring');
+            setGpsState(lastPosRef.current ? 'active' : 'acquiring');
           }
         } else {
           setGpsErrorMsg(err.message || 'Unable to obtain location');
@@ -216,7 +231,7 @@ export default function MapPage() {
       },
       { enableHighAccuracy: true, maximumAge: 5000, timeout: 12000 }
     );
-  }, [gpsRetries]);
+  }, []);
 
   useEffect(() => {
     startWatch();
@@ -306,20 +321,27 @@ export default function MapPage() {
     } catch { /* silent */ }
   }, []);
 
+  const loadExploreRef = useRef(loadExplore);
+  loadExploreRef.current = loadExplore;
+
   const initialLoad = useCallback(async () => {
-    setLoading(true);
     await loadOverlays();
-    await loadExplore(center[0], center[1]);
-    setLoading(false);
-  }, [loadExplore, loadOverlays, center]);
+    await loadExplore(centerRef.current[0], centerRef.current[1]);
+  }, [loadExplore, loadOverlays]);
 
   useEffect(() => {
-    initialLoad();
+    let cancelled = false;
+    initialLoad().finally(() => {
+      if (!cancelled) setLoading(false);
+    });
     const interval = setInterval(() => {
-      if (!socket?.connected) loadExplore(center[0], center[1]);
+      if (!socketRef.current?.connected) loadExplore(centerRef.current[0], centerRef.current[1]);
     }, 30000);
-    return () => clearInterval(interval);
-  }, [initialLoad, socket, center]);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [initialLoad]);
 
   /* ---------------- Real-time ---------------- */
   const applyIssuePatch = useCallback((msg: any) => {
@@ -385,13 +407,13 @@ export default function MapPage() {
     if (!socket) return;
     const handler = (msg: any) => {
       applyIssuePatch(msg);
-      if (msg?.type === 'created') loadExplore(center[0], center[1]);
+      if (msg?.type === 'created') loadExplore(centerRef.current[0], centerRef.current[1]);
     };
     socket.on('issue:update', handler);
     return () => {
       socket.off('issue:update', handler);
     };
-  }, [socket, applyIssuePatch, loadExplore, center]);
+  }, [socket, applyIssuePatch, loadExplore]);
 
   /* ---------------- Derived ---------------- */
   const departments = useMemo(() => {
@@ -578,7 +600,7 @@ export default function MapPage() {
                 <div className="h-full w-full flex items-center justify-center">
                   <div className="text-center">
                     <p className="text-red-500 text-sm font-medium">{dataError}</p>
-                    <button onClick={() => initialLoad()} className="mt-2 text-xs text-emerald-600 hover:underline">Retry</button>
+                    <button onClick={() => { setDataError(null); setLoading(true); initialLoad().finally(() => setLoading(false)); }} className="mt-2 text-xs text-emerald-600 hover:underline">Retry</button>
                   </div>
                 </div>
               ) : (
