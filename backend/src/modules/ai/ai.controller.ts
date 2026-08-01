@@ -198,7 +198,7 @@ export class AiController {
     }
     try {
       const reply = await this.conversationService.chat(user, body);
-      return { ...reply, success: true, timestamp: new Date().toISOString() };
+      res.status(HttpStatus.OK).json({ ...reply, success: true, timestamp: new Date().toISOString() });
     } catch (e: any) {
       throw new HttpException(e.message || 'AI service error', e.status || HttpStatus.INTERNAL_SERVER_ERROR);
     }
