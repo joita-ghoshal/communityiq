@@ -225,7 +225,7 @@ export class GisService {
         pincode: issue.pincode,
         lat: loc?.lat ?? null,
         lng: loc?.lng ?? null,
-        distanceKm: distanceKm ? Math.round(distanceKm * 100) / 100 : null,
+        distanceKm: distanceKm != null ? Math.round(distanceKm * 100) / 100 : null,
         riskScore: issue.riskScore,
         communityScore: issue.communityScore,
         impactScore: issue.impactScore,
