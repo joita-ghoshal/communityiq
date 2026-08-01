@@ -2,94 +2,81 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import rehypeHighlight from 'rehype-highlight';
-import { CheckIcon, ClipboardDocumentIcon } from '@heroicons/react/24/outline';
 
-function CodeBlock({ children, language }: { children: React.ReactNode; language?: string }) {
+function CodeBlock({ children }: { children: React.ReactNode }) {
   const [copied, setCopied] = useState(false);
   const text = String(children ?? '').replace(/\n$/, '');
-
-  const copy = () => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    });
-  };
-
   return (
-    <div className="relative group/code my-2 overflow-hidden rounded-xl border border-slate-700/60 bg-[#0b1220] shadow-lg">
-      <div className="flex items-center justify-between px-3.5 py-1.5 bg-white/[0.04] border-b border-slate-700/50">
-        <div className="flex items-center gap-1.5">
-          <span className="w-2 h-2 rounded-full bg-red-400/70" />
-          <span className="w-2 h-2 rounded-full bg-amber-400/70" />
-          <span className="w-2 h-2 rounded-full bg-emerald-400/70" />
-          <span className="ml-2 text-[10px] font-medium uppercase tracking-wider text-slate-400">
-            {language || 'code'}
-          </span>
-        </div>
-        <button
-          onClick={copy}
-          className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-medium text-slate-300 hover:bg-white/10 transition-colors opacity-100 md:opacity-0 md:group-hover/code:opacity-100 focus-visible:opacity-100"
-          aria-label="Copy code"
-        >
-          {copied ? <CheckIcon className="w-3 h-3 text-emerald-400" /> : <ClipboardDocumentIcon className="w-3 h-3" />}
-          {copied ? 'Copied' : 'Copy'}
-        </button>
-      </div>
-      <pre className="overflow-x-auto text-[12.5px] leading-relaxed">
+    <div className="relative group/code my-2">
+      <pre className="bg-slate-950 dark:bg-slate-950 text-slate-100 rounded-xl p-3 pr-10 overflow-x-auto text-[12px] leading-relaxed">
         <code>{text}</code>
       </pre>
+      <button
+        onClick={() => {
+          navigator.clipboard.writeText(text).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 1500);
+          });
+        }}
+        className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-white/10 text-slate-300 hover:bg-white/20 transition-colors opacity-0 group-hover/code:opacity-100"
+      >
+        {copied ? 'Copied' : 'Copy'}
+      </button>
     </div>
   );
 }
 
 export default function Markdown({ content, className = '' }: { content: string; className?: string }) {
   return (
-    <div className={`ai-markdown ${className}`}>
+    <div className={`markdown-body text-sm leading-relaxed ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        rehypePlugins={[rehypeHighlight]}
         components={{
           code({ inline, className: _cn, children, ...props }: any) {
+            const match = /language-(\w+)/.exec(_cn || '');
             if (inline) {
               return (
-                <code className="px-1.5 py-0.5 rounded-md bg-sky-500/10 dark:bg-indigo-500/20 text-sky-700 dark:text-sky-300 text-[12px]" {...props}>
+                <code className="px-1 py-0.5 rounded bg-slate-200/70 dark:bg-slate-700/70 text-[12px]" {...props}>
                   {children}
                 </code>
               );
             }
-            const match = /language-(\w+)/.exec(_cn || '');
-            return <CodeBlock language={match?.[1]}>{children}</CodeBlock>;
+            if (match) {
+              return (
+                <CodeBlock>
+                  {children}
+                </CodeBlock>
+              );
+            }
+            return (
+              <CodeBlock>
+                {children}
+              </CodeBlock>
+            );
           },
           a({ href, children }: any) {
             return (
-              <a href={href} target="_blank" rel="noopener noreferrer" className="text-sky-600 dark:text-sky-400 underline underline-offset-2 hover:text-sky-700 dark:hover:text-sky-300 transition-colors">
+              <a href={href} target="_blank" rel="noopener noreferrer" className="text-sky-600 dark:text-sky-400 underline underline-offset-2">
                 {children}
               </a>
             );
           },
-          h1: (props: any) => <h1 {...props} />,
-          h2: (props: any) => <h2 {...props} />,
-          h3: (props: any) => <h3 {...props} />,
-          h4: (props: any) => <h4 {...props} />,
-          ul: (props: any) => <ul {...props} />,
-          ol: (props: any) => <ol {...props} />,
-          li: (props: any) => <li {...props} />,
-          p: (props: any) => <p {...props} />,
+          h1: (props: any) => <h1 className="text-base font-bold mt-3 mb-1.5" {...props} />,
+          h2: (props: any) => <h2 className="text-[15px] font-bold mt-3 mb-1.5" {...props} />,
+          h3: (props: any) => <h3 className="text-sm font-bold mt-2.5 mb-1" {...props} />,
+          ul: (props: any) => <ul className="list-disc pl-4 my-1.5 space-y-0.5" {...props} />,
+          ol: (props: any) => <ol className="list-decimal pl-4 my-1.5 space-y-0.5" {...props} />,
+          li: (props: any) => <li className="markdown-li" {...props} />,
+          p: (props: any) => <p className="my-1.5" {...props} />,
           strong: (props: any) => <strong className="font-bold" {...props} />,
-          em: (props: any) => <em {...props} />,
-          hr: (props: any) => <hr {...props} />,
           table: (props: any) => (
-            <div className="overflow-x-auto my-2 rounded-xl">
+            <div className="overflow-x-auto my-2">
               <table className="text-xs border-collapse min-w-full" {...props} />
             </div>
           ),
-          thead: (props: any) => <thead {...props} />,
-          tbody: (props: any) => <tbody {...props} />,
-          tr: (props: any) => <tr className="even:bg-slate-500/5" {...props} />,
-          th: (props: any) => <th className="border-b border-slate-300 dark:border-slate-600 px-3 py-2 text-left font-semibold" {...props} />,
-          td: (props: any) => <td className="border-b border-slate-200/70 dark:border-slate-700/50 px-3 py-2" {...props} />,
-          blockquote: (props: any) => <blockquote {...props} />,
+          th: (props: any) => <th className="border border-slate-300 dark:border-slate-600 px-2 py-1 text-left font-semibold" {...props} />,
+          td: (props: any) => <td className="border border-slate-300 dark:border-slate-600 px-2 py-1" {...props} />,
+          blockquote: (props: any) => <blockquote className="border-l-4 border-slate-300 dark:border-slate-600 pl-3 my-2 italic" {...props} />,
         }}
       >
         {content}

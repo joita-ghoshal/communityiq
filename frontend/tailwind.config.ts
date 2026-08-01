@@ -37,10 +37,6 @@ const config: Config = {
         'bounce-slow': 'bounce 3s infinite',
         'spin-slow': 'spin 8s linear infinite',
         'alert-flash': 'alert-flash 1s ease-in-out infinite',
-        'blob': 'blob-drift 18s ease-in-out infinite',
-        'caret': 'caret-blink 0.9s step-end infinite',
-        'typing': 'typing-bounce 1.2s ease-in-out infinite',
-        'gradient-x': 'gradient-x 7s ease infinite',
       },
       keyframes: {
         'pulse-glow': {
@@ -70,23 +66,6 @@ const config: Config = {
         'alert-flash': {
           '0%, 100%': { opacity: '1' },
           '50%': { opacity: '0.3' },
-        },
-        'blob-drift': {
-          '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
-          '33%': { transform: 'translate(36px, -24px) scale(1.12)' },
-          '66%': { transform: 'translate(-24px, 18px) scale(0.94)' },
-        },
-        'caret-blink': {
-          '0%, 100%': { opacity: '1' },
-          '50%': { opacity: '0' },
-        },
-        'typing-bounce': {
-          '0%, 60%, 100%': { transform: 'translateY(0)', opacity: '0.35' },
-          '30%': { transform: 'translateY(-4px)', opacity: '1' },
-        },
-        'gradient-x': {
-          '0%, 100%': { backgroundPosition: '0% 50%' },
-          '50%': { backgroundPosition: '100% 50%' },
         },
       },
       backdropBlur: {
