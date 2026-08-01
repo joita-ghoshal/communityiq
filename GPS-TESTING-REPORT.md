@@ -63,7 +63,45 @@
 18. iPhone/Android: map fills screen, FABs reachable, panels scroll; GPS via cellular works; compass rotates.
 19. Desktop: sidebar layout intact, all panels glassmorphism in dark & light mode (OS theme toggle).
 
-## 3. Known Notes
+## 3. Critical Bug Fix — Live Map stuck on infinite "Loading..." (2 Aug 2026)
+
+### Root cause (found via browser debugging, not guesswork)
+The map page was **unmounted and remounted on every GPS position update**:
+
+1. `center = userPosition ?? KOLKATA_CENTER` changed on **every** `watchPosition` fix (phones fire every 1–5 s continuously).
+2. `initialLoad` was a `useCallback` whose deps included `center`, and the data effect ran on `[initialLoad, socket, center]` → re-ran on every GPS fix.
+3. Each run set `loading = true`, which **replaced the entire Leaflet map with the spinner** (not an overlay).
+4. After ~1–2 s of fetches `loading = false`, a fresh Leaflet instance remounted (re-init + tile reload), then the next GPS fix flipped it back.
+
+Net effect: the map could never settle → "Loading..." indefinitely. GPS itself worked (position was detected), which is why the app found the location but never showed the map.
+
+**Second bug (blank/invisible map):** the map wrapper used `minHeight: calc(100vh - 17rem)` with `height` undefined. A percentage-height Leaflet child (`height:100%`) does **not** resolve against a min-height-only parent → `.leaflet-container` measured **0px tall** even though the wrapper was 448px. The map was technically mounted but invisible.
+
+### Fix (commits `0199e5a`, `b85db5a`)
+- **Decoupled loading from GPS:** `initialLoad` now runs exactly once on mount (stable refs `centerRef`/`socketRef`); GPS fixes only update the marker and trigger a background refresh — `loading` is never re-set, the map is never unmounted.
+- First GPS fix flies to the user (`flyTo`) and refreshes issues around the new position (background, non-blocking).
+- 25 m movement threshold for marker updates; retry counter moved to a ref (`startWatch` is now stable, no watch restart churn on retries).
+- **Explicit container height:** `height: calc(100vh - 17rem)` (fallback `minHeight: 320px`) so Leaflet gets a definite size.
+- Socket subscription no longer re-subscribes on GPS movement (removed `center` from deps).
+
+### Verification — automated browser session (Playwright/Chromium vs **production**)
+Geolocation mocked to fire a new fix **every 2 seconds** (the exact scenario that caused the original loop), console/network/page errors captured throughout:
+
+| Check | Before | After |
+|---|---|---|
+| Time until map renders | never (spinner forever) | **~1 s** |
+| `.leaflet-container` size | 978×**0** (invisible) | **978×446** |
+| Tiles loaded | — | 30 |
+| Issue markers + user dot | 1 (user only) | **4** (3 issues + user) |
+| GPS pill | — | **GPS Active** |
+| Spinner reappears during 15 s of continuous GPS fixes | yes | **never** |
+| Map element replaced during GPS updates | constantly | **stable (same DOM node)** |
+| Clicking an issue marker → detail panel (dept, reporter, distance, similar issues) | — | **opens** |
+| JS page errors | — | **NONE** |
+| API request failures | — | **NONE** |
+| Console errors | — | none (only harmless favicon 404) |
+
+
 - `/ai/chat` returns mock assistant until an OpenAI/Gemini key is added to Render env vars.
 - Nominatim (OSM) geocoding is rate-limited (~1 req/s); responses cached 1 h server-side.
 - Live sync falls back to 30 s polling when the socket disconnects.
