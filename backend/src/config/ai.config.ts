@@ -4,7 +4,7 @@ export const aiConfig = registerAs('ai', () => ({
   defaultProvider: process.env.AI_DEFAULT_PROVIDER || 'auto',
   gemini: {
     apiKey: process.env.GEMINI_API_KEY || '',
-    model: process.env.GEMINI_MODEL || 'gemini-2.0-flash',
+    model: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
   },
   openai: {
     apiKey: process.env.OPENAI_API_KEY || '',

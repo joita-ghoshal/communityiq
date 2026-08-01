@@ -43,7 +43,7 @@ export class AiEngineService {
     const ai: any = this.config.get('ai', { defaultProvider: 'auto', gemini: {}, openai: {}, groq: {}, openrouter: {} });
 
     const all: ProviderConfig[] = [
-      { id: 'gemini', apiKey: ai.gemini?.apiKey || '', model: ai.gemini?.model || 'gemini-2.0-flash' },
+      { id: 'gemini', apiKey: ai.gemini?.apiKey || '', model: ai.gemini?.model || 'gemini-3.5-flash-lite' },
       { id: 'openai', apiKey: ai.openai?.apiKey || '', model: ai.openai?.model || 'gpt-4o-mini' },
       { id: 'groq', apiKey: ai.groq?.apiKey || '', model: ai.groq?.model || 'llama-3.3-70b-versatile' },
       { id: 'openrouter', apiKey: ai.openrouter?.apiKey || '', model: ai.openrouter?.model || 'meta-llama/llama-3.3-70b-instruct:free' },

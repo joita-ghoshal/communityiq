@@ -742,7 +742,7 @@ Be helpful, concise, and guide users toward taking action. When appropriate, sug
         }));
 
         const resp = await axios.post(
-          `https://generativelanguage.googleapis.com/v1beta/models/${this.geminiModel || 'gemini-2.0-flash'}:generateContent?key=${this.geminiApiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/${this.geminiModel || 'gemini-3.5-flash-lite'}:generateContent?key=${this.geminiApiKey}`,
           {
             contents,
             generationConfig: {
