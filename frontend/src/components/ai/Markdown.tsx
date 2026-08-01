@@ -2,81 +2,80 @@
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import rehypeHighlight from 'rehype-highlight';
+import { Check, Copy } from 'lucide-react';
 
-function CodeBlock({ children }: { children: React.ReactNode }) {
+function CodeBlock({ children, language }: { children: React.ReactNode; language?: string }) {
   const [copied, setCopied] = useState(false);
   const text = String(children ?? '').replace(/\n$/, '');
+  const copy = () => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    });
+  };
   return (
-    <div className="relative group/code my-2">
-      <pre className="bg-slate-950 dark:bg-slate-950 text-slate-100 rounded-xl p-3 pr-10 overflow-x-auto text-[12px] leading-relaxed">
+    <div className="group/code my-3 overflow-hidden rounded-xl border border-slate-200 dark:border-slate-700/60 bg-white dark:bg-[hsl(222,40%,9%)] shadow-sm">
+      <div className="flex items-center justify-between px-3 py-1.5 border-b border-slate-100 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-900/90">
+        <div className="flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-full bg-red-400/90" />
+          <span className="w-2.5 h-2.5 rounded-full bg-amber-400/90" />
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400/90" />
+          {language && (
+            <span className="ml-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">{language}</span>
+          )}
+        </div>
+        <button
+          onClick={copy}
+          className="flex items-center gap-1.5 text-[10px] font-medium text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors opacity-0 group-hover/code:opacity-100 ai-focus-ring rounded-md px-1.5 py-0.5"
+          title="Copy code"
+        >
+          {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <pre className="overflow-x-auto p-3.5 text-[12.5px] leading-relaxed text-slate-800 dark:text-slate-100">
         <code>{text}</code>
       </pre>
-      <button
-        onClick={() => {
-          navigator.clipboard.writeText(text).then(() => {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-          });
-        }}
-        className="absolute top-2 right-2 px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-white/10 text-slate-300 hover:bg-white/20 transition-colors opacity-0 group-hover/code:opacity-100"
-      >
-        {copied ? 'Copied' : 'Copy'}
-      </button>
     </div>
   );
 }
 
 export default function Markdown({ content, className = '' }: { content: string; className?: string }) {
   return (
-    <div className={`markdown-body text-sm leading-relaxed ${className}`}>
+    <div className={`ai-markdown ${className}`}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        rehypePlugins={[rehypeHighlight]}
         components={{
           code({ inline, className: _cn, children, ...props }: any) {
-            const match = /language-(\w+)/.exec(_cn || '');
             if (inline) {
               return (
-                <code className="px-1 py-0.5 rounded bg-slate-200/70 dark:bg-slate-700/70 text-[12px]" {...props}>
+                <code className="ai-inline-code" {...props}>
                   {children}
                 </code>
               );
             }
-            if (match) {
-              return (
-                <CodeBlock>
-                  {children}
-                </CodeBlock>
-              );
-            }
-            return (
-              <CodeBlock>
-                {children}
-              </CodeBlock>
-            );
+            const lang = /language-(\w+)/.exec(_cn || '')?.[1];
+            return <CodeBlock language={lang}>{children}</CodeBlock>;
           },
           a({ href, children }: any) {
             return (
-              <a href={href} target="_blank" rel="noopener noreferrer" className="text-sky-600 dark:text-sky-400 underline underline-offset-2">
+              <a href={href} target="_blank" rel="noopener noreferrer">
                 {children}
               </a>
             );
           },
-          h1: (props: any) => <h1 className="text-base font-bold mt-3 mb-1.5" {...props} />,
-          h2: (props: any) => <h2 className="text-[15px] font-bold mt-3 mb-1.5" {...props} />,
-          h3: (props: any) => <h3 className="text-sm font-bold mt-2.5 mb-1" {...props} />,
-          ul: (props: any) => <ul className="list-disc pl-4 my-1.5 space-y-0.5" {...props} />,
-          ol: (props: any) => <ol className="list-decimal pl-4 my-1.5 space-y-0.5" {...props} />,
-          li: (props: any) => <li className="markdown-li" {...props} />,
-          p: (props: any) => <p className="my-1.5" {...props} />,
-          strong: (props: any) => <strong className="font-bold" {...props} />,
-          table: (props: any) => (
-            <div className="overflow-x-auto my-2">
-              <table className="text-xs border-collapse min-w-full" {...props} />
-            </div>
+          table: (props: any) => <table {...props} />,
+          blockquote: (props: any) => <blockquote {...props} />,
+          input: (props: any) => (
+            <input
+              type="checkbox"
+              checked={props.checked}
+              readOnly
+              className="mr-1.5 -mt-0.5 inline-block align-middle accent-sky-600 dark:accent-sky-400"
+            />
           ),
-          th: (props: any) => <th className="border border-slate-300 dark:border-slate-600 px-2 py-1 text-left font-semibold" {...props} />,
-          td: (props: any) => <td className="border border-slate-300 dark:border-slate-600 px-2 py-1" {...props} />,
-          blockquote: (props: any) => <blockquote className="border-l-4 border-slate-300 dark:border-slate-600 pl-3 my-2 italic" {...props} />,
         }}
       >
         {content}

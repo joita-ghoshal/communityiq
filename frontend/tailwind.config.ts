@@ -12,6 +12,7 @@ const config: Config = {
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         heading: ['Poppins', 'system-ui', 'sans-serif'],
+        display: ['Manrope', 'Poppins', 'system-ui', 'sans-serif'],
       },
       colors: {
         brand: {
