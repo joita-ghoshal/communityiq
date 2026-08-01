@@ -6,11 +6,27 @@ export interface ConversationPreview {
 const PREVIEWS_KEY = 'fmc-ai-previews';
 
 export function getConversationPreviews(): Record<string, ConversationPreview> {
+  let raw: Record<string, unknown> = {};
   try {
-    return JSON.parse(localStorage.getItem(PREVIEWS_KEY) || '{}') || {};
+    raw = JSON.parse(localStorage.getItem(PREVIEWS_KEY) || '{}') || {};
   } catch {
-    return {};
+    raw = {};
   }
+  const clean: Record<string, ConversationPreview> = {};
+  for (const [id, entry] of Object.entries(raw)) {
+    const p = entry as Partial<ConversationPreview> | undefined;
+    if (p && typeof p.text === 'string' && p.text.trim() && typeof p.at === 'number' && !Number.isNaN(p.at)) {
+      clean[id] = { text: p.text.slice(0, 110), at: p.at };
+    }
+  }
+  if (Object.keys(clean).length !== Object.keys(raw).length) {
+    try {
+      localStorage.setItem(PREVIEWS_KEY, JSON.stringify(clean));
+    } catch {
+      /* storage unavailable */
+    }
+  }
+  return clean;
 }
 
 export function saveConversationPreview(id: string, preview: ConversationPreview) {

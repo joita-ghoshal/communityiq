@@ -36,15 +36,27 @@ function timeAgo(iso: string) {
   }
 }
 
+function safeStampAgo(t: number | string) {
+  try {
+    return timeAgo(new Date(t).toISOString());
+  } catch {
+    return '';
+  }
+}
+
 function dayGroup(iso: string): string {
-  const d = new Date(iso);
-  const now = new Date();
-  const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
-  const dayDiff = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
-  if (dayDiff <= 0) return 'Today';
-  if (dayDiff === 1) return 'Yesterday';
-  if (dayDiff < 7) return 'Previous 7 days';
-  return 'Older';
+  try {
+    const d = new Date(iso);
+    const now = new Date();
+    const startOfDay = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const dayDiff = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
+    if (dayDiff <= 0) return 'Today';
+    if (dayDiff === 1) return 'Yesterday';
+    if (dayDiff < 7) return 'Previous 7 days';
+    return 'Older';
+  } catch {
+    return 'Older';
+  }
 }
 
 const GROUP_ORDER = ['Pinned', 'Today', 'Yesterday', 'Previous 7 days', 'Older'];
@@ -297,7 +309,7 @@ export default function ConversationSidebar({
                                   {preview?.text || 'No messages yet'}
                                 </p>
                                 <p className="text-[10px] text-slate-400/90 dark:text-slate-500 mt-0.5">
-                                  {preview ? timeAgo(new Date(preview.at).toISOString()) : timeAgo(c.updatedAt)} · {c.messageCount} msgs
+                                  {preview ? safeStampAgo(preview.at) : timeAgo(c.updatedAt)} · {c.messageCount} msgs
                                 </p>
                               </>
                             )}
