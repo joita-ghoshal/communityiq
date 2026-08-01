@@ -516,7 +516,7 @@ export class GisService {
       .createQueryBuilder('alert')
       .where('alert.isActive = true')
       .andWhere(
-        `ST_DWithin(alert.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, COALESCE((alert.affectedArea->>'radius')::numeric, 1000))`,
+        `ST_DWithin(alert.location::geography, ST_SetSRID(ST_MakePoint(:lng, :lat), 4326)::geography, COALESCE((alert."affectedArea"->>'radius')::numeric, 1000))`,
         { lat, lng },
       )
       .getMany();
