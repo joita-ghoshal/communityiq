@@ -587,7 +587,11 @@ export default function MapPage() {
             <div
               id="live-map-container"
               className="relative rounded-2xl overflow-hidden bg-slate-200 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
-              style={{ minHeight: 'calc(100vh - 17rem)', width: '100%', height: fullscreen ? '100vh' : undefined }}
+              style={{
+                width: '100%',
+                height: fullscreen ? '100vh' : 'calc(100vh - 17rem)',
+                minHeight: '320px',
+              }}
             >
               {loading ? (
                 <div className="h-full w-full flex items-center justify-center">
