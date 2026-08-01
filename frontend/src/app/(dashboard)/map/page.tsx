@@ -1,895 +1,753 @@
 'use client';
-import { useState, useEffect, useCallback, Suspense } from 'react';
-import dynamic from 'next/dynamic';
+import { useState, useEffect, useCallback, useRef, Suspense, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTheme } from 'next-themes';
 import {
-  MapIcon, Squares2X2Icon, ListBulletIcon, MapPinIcon, ViewfinderCircleIcon,
-  ArrowPathIcon, XMarkIcon, ExclamationTriangleIcon, FunnelIcon,
+  MapIcon, FunnelIcon, ViewfinderCircleIcon, ArrowsPointingOutIcon,
+  ArrowsPointingInIcon, ScaleIcon, MapPinIcon, BoltIcon,
+  Squares2X2Icon, ListBulletIcon, XMarkIcon, CheckBadgeIcon, FireIcon,
+  SparklesIcon, ShieldExclamationIcon, UsersIcon, WifiIcon,
 } from '@heroicons/react/24/outline';
 import AppShell from '@/components/layout/AppShell';
-import api from '@/lib/api';
 import { pageThemes } from '@/lib/theme/page-themes';
-import { getCategoryIcon } from '@/lib/utils';
+import { useSocket } from '@/contexts/SocketContext';
+import api from '@/lib/api';
+import { DynamicMapView, MapIssue, RiskZone, OverlayState } from '@/components/map/MapView';
+import MapSearchBox, { SearchSelection } from '@/components/map/MapSearchBox';
+import MapFiltersPanel, { MapFilters, DEFAULT_FILTERS } from '@/components/map/MapFiltersPanel';
+import IssueDetailPanel from '@/components/map/IssueDetailPanel';
+import {
+  KOLKATA_CENTER, haversineKm, formatDistance, statusMatchesGroup,
+  statusLabel, categoryEmoji, categoryLabel, priorityLabel,
+} from '@/lib/map-data';
 
-const ALL_STATUSES = [
-  'reported', 'ai_analyzing', 'community_verification', 'verified',
-  'assigned', 'work_started', 'in_progress', 'partially_resolved',
-  'awaiting_ai_verification', 'awaiting_citizen_confirmation',
-  'resolved', 'closed', 'archived', 'duplicate', 'reopened', 'invalid',
-] as const;
+type GpsState = 'idle' | 'acquiring' | 'active' | 'denied' | 'unavailable' | 'error';
 
-type IssueStatus = typeof ALL_STATUSES[number];
+const DEFAULT_OVERLAYS: OverlayState = { heatmap: false, riskZones: false, predicted: false, duplicates: false, community: false };
 
-const INACTIVE_STATUSES: Set<string> = new Set([
-  'resolved', 'closed', 'archived', 'duplicate', 'invalid',
-]);
-
-const STATUS_COLORS: Record<string, { bg: string; text: string; dot: string; hex: string }> = {
-  reported:                       { bg: 'bg-blue-100 dark:bg-blue-900/30',   text: 'text-blue-700 dark:text-blue-300',   dot: 'bg-blue-500',   hex: '#3b82f6' },
-  ai_analyzing:                   { bg: 'bg-blue-100 dark:bg-blue-900/30',   text: 'text-blue-700 dark:text-blue-300',   dot: 'bg-blue-500',   hex: '#3b82f6' },
-  community_verification:         { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-700 dark:text-purple-300', dot: 'bg-purple-500', hex: '#a855f7' },
-  verified:                       { bg: 'bg-purple-100 dark:bg-purple-900/30', text: 'text-purple-700 dark:text-purple-300', dot: 'bg-purple-500', hex: '#a855f7' },
-  assigned:                       { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-300', dot: 'bg-orange-500', hex: '#f97316' },
-  work_started:                   { bg: 'bg-orange-100 dark:bg-orange-900/30', text: 'text-orange-700 dark:text-orange-300', dot: 'bg-orange-500', hex: '#f97316' },
-  in_progress:                    { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-300', dot: 'bg-yellow-500', hex: '#eab308' },
-  partially_resolved:             { bg: 'bg-yellow-100 dark:bg-yellow-900/30', text: 'text-yellow-700 dark:text-yellow-300', dot: 'bg-yellow-500', hex: '#eab308' },
-  awaiting_ai_verification:       { bg: 'bg-cyan-100 dark:bg-cyan-900/30',   text: 'text-cyan-700 dark:text-cyan-300',   dot: 'bg-cyan-500',   hex: '#06b6d4' },
-  awaiting_citizen_confirmation:  { bg: 'bg-green-100 dark:bg-green-900/30',  text: 'text-green-700 dark:text-green-300',  dot: 'bg-green-500',  hex: '#22c55e' },
-  resolved:                       { bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500', hex: '#10b981' },
-  closed:                         { bg: 'bg-gray-100 dark:bg-gray-900/30',   text: 'text-gray-700 dark:text-gray-300',   dot: 'bg-gray-500',   hex: '#6b7280' },
-  archived:                       { bg: 'bg-gray-100 dark:bg-gray-900/30',   text: 'text-gray-700 dark:text-gray-300',   dot: 'bg-gray-500',   hex: '#6b7280' },
-  duplicate:                      { bg: 'bg-gray-100 dark:bg-gray-900/30',   text: 'text-gray-700 dark:text-gray-300',   dot: 'bg-gray-500',   hex: '#6b7280' },
-  reopened:                       { bg: 'bg-amber-100 dark:bg-amber-900/30',  text: 'text-amber-700 dark:text-amber-300',  dot: 'bg-amber-500',  hex: '#f59e0b' },
-  invalid:                        { bg: 'bg-gray-100 dark:bg-gray-900/30',   text: 'text-gray-700 dark:text-gray-300',   dot: 'bg-gray-500',   hex: '#6b7280' },
-};
-
-const STATUS_TRANSITIONS: Record<string, string[]> = {
-  reported:                      ['ai_analyzing', 'community_verification', 'verified', 'invalid'],
-  ai_analyzing:                  ['community_verification', 'verified', 'invalid'],
-  community_verification:        ['verified', 'duplicate', 'invalid'],
-  verified:                      ['assigned', 'duplicate', 'invalid'],
-  assigned:                      ['work_started', 'duplicate', 'invalid'],
-  work_started:                  ['in_progress', 'partially_resolved'],
-  in_progress:                   ['partially_resolved', 'awaiting_ai_verification', 'awaiting_citizen_confirmation', 'resolved'],
-  partially_resolved:            ['in_progress', 'awaiting_ai_verification', 'awaiting_citizen_confirmation', 'resolved'],
-  awaiting_ai_verification:      ['resolved', 'in_progress', 'partially_resolved'],
-  awaiting_citizen_confirmation: ['resolved', 'reopened', 'in_progress'],
-  resolved:                      ['closed', 'reopened'],
-  closed:                        ['archived', 'reopened'],
-  archived:                      [],
-  duplicate:                     ['reopened'],
-  reopened:                      ['assigned', 'work_started', 'in_progress', 'invalid'],
-  invalid:                       ['reopened'],
-};
-
-const filterCategories = ['All', 'Road Damage', 'Water Leakage', 'Garbage', 'Electricity', 'Drainage', 'Safety'];
-const catToInternal: Record<string, string> = {
-  'Road Damage': 'road_damage',
-  'Water Leakage': 'water_leakage',
-  'Garbage': 'garbage',
-  'Electricity': 'electricity',
-  'Drainage': 'drainage',
-  'Safety': 'public_safety',
-};
-
-const PRIORITY_COLORS: Record<string, string> = {
-  critical: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-  high: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
-  medium: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
-  low: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',
-};
-
-interface MapIssue {
+interface RawIssueItem {
   id: string;
   title: string;
   description: string;
   category: string;
-  status: string;
   priority: string;
-  lat: number;
-  lng: number;
-  address?: string;
-  city?: string;
-  reporter?: string;
-  createdAt?: string;
-  completionPercentage?: number;
-  riskScore?: number;
-  assignedTeam?: string;
-  assignedDepartment?: string;
-  reportedBy?: { name?: string; email?: string };
-}
-
-interface UserProfile {
-  role?: string;
-}
-
-const statusFilterGroups: { label: string; value: string; statuses?: string[] }[] = [
-  { label: 'Active', value: '__active' },
-  { label: 'All', value: 'all' },
-  { label: 'Reported', value: '__reported', statuses: ['reported', 'ai_analyzing'] },
-  { label: 'In Progress', value: '__in_progress', statuses: ['assigned', 'work_started', 'in_progress', 'partially_resolved'] },
-  { label: 'Resolved', value: '__resolved', statuses: ['resolved', 'closed'] },
-];
-
-function statusMatchesFilter(status: string, filterValue: string): boolean {
-  if (filterValue === 'all') return true;
-  if (filterValue === '__active') return !INACTIVE_STATUSES.has(status);
-  const group = statusFilterGroups.find((g) => g.value === filterValue);
-  if (group?.statuses) return group.statuses.includes(status);
-  return status === filterValue;
-}
-
-function formatStatus(status: string): string {
-  return status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-}
-
-interface StatusBadgeProps {
   status: string;
-  className?: string;
+  lat?: number | null;
+  lng?: number | null;
+  location?: any;
+  latitude?: number;
+  longitude?: number;
+  distanceKm?: number | null;
+  riskScore?: number | null;
+  communityScore?: number | null;
+  upvotes?: number;
+  downvotes?: number;
+  isUrgent?: boolean;
+  completionPercentage?: number | null;
+  createdAt?: string;
+  address?: string;
+  ward?: string | null;
+  pincode?: string | null;
+  department?: { id: string; name: string; code?: string } | null;
+  reporter?: { id: string; name: string } | null;
+  aiAnalysis?: any;
+  verification?: any;
+  verificationData?: any;
 }
 
-function StatusBadge({ status, className = '' }: StatusBadgeProps) {
-  const colors = STATUS_COLORS[status] || STATUS_COLORS.reported;
-  return (
-    <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full ${colors.bg} ${colors.text} ${className}`}>
-      <span className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
-      {formatStatus(status)}
-    </span>
-  );
+function parseLatLng(item: RawIssueItem): { lat: number | null; lng: number | null } {
+  let lat: number | null = null;
+  let lng: number | null = null;
+  if (item.lat != null) lat = Number(item.lat);
+  if (item.lng != null) lng = Number(item.lng);
+  if (item.latitude != null) lat = Number(item.latitude);
+  if (item.longitude != null) lng = Number(item.longitude);
+  if (lat == null && item.location) {
+    if (item.location.type === 'Point' && Array.isArray(item.location.coordinates)) {
+      lng = Number(item.location.coordinates[0]);
+      lat = Number(item.location.coordinates[1]);
+    } else if (item.location.latitude != null) {
+      lat = Number(item.location.latitude);
+      lng = Number(item.location.longitude);
+    }
+  }
+  return { lat, lng };
 }
 
-function ProgressRing({ percentage }: { percentage: number }) {
-  const clamped = Math.min(100, Math.max(0, percentage));
-  const radius = 18;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (clamped / 100) * circumference;
-  return (
-    <div className="relative flex items-center justify-center">
-      <svg width="48" height="48" viewBox="0 0 48 48">
-        <circle cx="24" cy="24" r={radius} fill="none" stroke="#e2e8f0" strokeWidth="4" className="dark:stroke-slate-700" />
-        <circle
-          cx="24" cy="24" r={radius} fill="none" stroke="#10b981" strokeWidth="4"
-          strokeDasharray={circumference} strokeDashoffset={offset}
-          strokeLinecap="round" transform="rotate(-90 24 24)"
-          className="transition-all duration-500"
-        />
-      </svg>
-      <span className="absolute text-[10px] font-bold text-slate-700 dark:text-slate-300">{clamped}%</span>
-    </div>
-  );
+function toMapIssue(item: RawIssueItem): MapIssue {
+  const { lat, lng } = parseLatLng(item);
+  const vd = item.verificationData;
+  return {
+    id: String(item.id),
+    title: item.title ?? 'Untitled',
+    description: item.description ?? '',
+    category: item.category ?? 'other',
+    priority: item.priority ?? 'medium',
+    status: item.status ?? 'reported',
+    lat,
+    lng,
+    distanceKm: item.distanceKm != null ? Number(item.distanceKm) : null,
+    riskScore: item.riskScore ?? null,
+    communityScore: item.communityScore ?? null,
+    upvotes: item.upvotes ?? 0,
+    downvotes: item.downvotes ?? 0,
+    isUrgent: !!item.isUrgent,
+    completionPercentage: item.completionPercentage ?? null,
+    createdAt: item.createdAt ?? '',
+    address: item.address ?? '',
+    ward: item.ward ?? null,
+    pincode: item.pincode ?? null,
+    department: item.department
+      ? { id: String(item.department.id), name: item.department.name, code: item.department.code }
+      : null,
+    reporter: item.reporter
+      ? { id: String(item.reporter.id), name: item.reporter.name }
+      : null,
+    aiAnalysis: item.aiAnalysis
+      ? {
+          severity: item.aiAnalysis.severity ?? null,
+          summary: item.aiAnalysis.summary ?? null,
+          duplicateProbability: item.aiAnalysis.duplicateProbability ?? null,
+          fakeProbability: item.aiAnalysis.fakeProbability ?? null,
+          recommendedDepartment: item.aiAnalysis.recommendedDepartment ?? null,
+        }
+      : null,
+    verification: item.verification ?? (vd ? { aiVerified: vd.aiVerified ?? false, aiConfidence: vd.aiConfidence ?? null, citizenConfirmed: vd.citizenConfirmed ?? null } : null),
+  };
 }
-
-const categoryMarkerColors: Record<string, { color: string; svg: string }> = {
-  road_damage: { color: '#f97316', svg: '🛤️' },
-  water_leakage: { color: '#3b82f6', svg: '💧' },
-  garbage: { color: '#22c55e', svg: '🗑️' },
-  electricity: { color: '#eab308', svg: '⚡' },
-  drainage: { color: '#06b6d4', svg: '🌊' },
-  public_safety: { color: '#ef4444', svg: '🛡️' },
-  street_lighting: { color: '#a855f7', svg: '💡' },
-  environmental: { color: '#84cc16', svg: '🌿' },
-};
-
-function createPinIcon(L: typeof import('leaflet'), issue: MapIssue) {
-  const statusColor = STATUS_COLORS[issue.status]?.hex || '#6b7280';
-  const isHighRisk = (issue.riskScore ?? 0) > 70;
-  const riskGlow = isHighRisk
-    ? `<circle cx="14" cy="14" r="22" fill="${statusColor}" opacity="0.18"><animate attributeName="r" values="18;24;18" dur="2s" repeatCount="indefinite"/><animate attributeName="opacity" values="0.25;0.08;0.25" dur="2s" repeatCount="indefinite"/></circle>`
-    : '';
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="40" viewBox="0 0 28 40">
-    ${riskGlow}
-    <path d="M14 0C6.268 0 0 6.268 0 14c0 10.5 14 26 14 26s14-15.5 14-26C28 6.268 21.732 0 14 0z" fill="${statusColor}"/>
-    <circle cx="14" cy="13" r="6" fill="white" opacity="0.9"/>
-    ${isHighRisk ? `<circle cx="14" cy="13" r="6" fill="none" stroke="#ef4444" stroke-width="1.5"><animate attributeName="r" values="6;8;6" dur="1.5s" repeatCount="indefinite"/><animate attributeName="opacity" values="1;0.3;1" dur="1.5s" repeatCount="indefinite"/></circle>` : ''}
-  </svg>`;
-  return L.divIcon({
-    html: svg,
-    className: '',
-    iconSize: [28, 40],
-    iconAnchor: [14, 40],
-    popupAnchor: [0, -40],
-  });
-}
-
-interface LeafletMapProps {
-  center: [number, number];
-  issues: MapIssue[];
-  onIssueClick: (id: string) => void;
-  userPosition?: [number, number] | null;
-}
-
-const DynamicLeafletMap = dynamic<LeafletMapProps>(
-  async () => {
-    await import('leaflet/dist/leaflet.css');
-    const { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } = await import('react-leaflet');
-    const L = (await import('leaflet')).default;
-
-    delete (L.Icon.Default.prototype as any)._getIconUrl;
-    L.Icon.Default.mergeOptions({
-      iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
-      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
-      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
-    });
-
-    function RecenterMap({ center }: { center: [number, number] }) {
-      const map = useMap();
-      useEffect(() => {
-        map.setView(center, map.getZoom());
-      }, [center, map]);
-      return null;
-    }
-
-    function LocateButton() {
-      const map = useMap();
-      const handleClick = useCallback(() => {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => map.setView([pos.coords.latitude, pos.coords.longitude], 15),
-          () => {},
-          { enableHighAccuracy: true }
-        );
-      }, [map]);
-      return (
-        <button
-          onClick={handleClick}
-          className="absolute top-4 right-4 z-[1000] bg-white dark:bg-slate-800 p-2.5 rounded-xl shadow-lg hover:shadow-xl transition-all flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300"
-        >
-          <ViewfinderCircleIcon className="w-4 h-4" />
-          Locate Me
-        </button>
-      );
-    }
-
-    function MapEventsHandler({ onIssueClick }: { onIssueClick: () => void }) {
-      useMapEvents({ click: () => onIssueClick() });
-      return null;
-    }
-
-    function UserLocationMarker({ position }: { position: [number, number] }) {
-      const userIcon = L.divIcon({
-        html: `<div style="position:relative;width:20px;height:20px;">
-          <div style="position:absolute;inset:0;border-radius:50%;background:rgba(59,130,246,0.25);animation:user-pulse 2s ease-in-out infinite;"></div>
-          <div style="position:absolute;top:4px;left:4px;width:12px;height:12px;border-radius:50%;background:#3b82f6;border:2.5px solid white;box-shadow:0 1px 4px rgba(0,0,0,0.3);"></div>
-          <style>@keyframes user-pulse{0%,100%{transform:scale(1);opacity:0.4}50%{transform:scale(2.2);opacity:0}}</style>
-        </div>`,
-        className: '',
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
-      });
-      return (
-        <Marker position={position} icon={userIcon}>
-          <Popup><div className="p-1"><p className="text-xs font-semibold text-blue-700">Your Location</p></div></Popup>
-        </Marker>
-      );
-    }
-
-    function LeafletMapInner({ center, issues, onIssueClick, userPosition }: LeafletMapProps) {
-      return (
-        <MapContainer
-          center={center}
-          zoom={13}
-          scrollWheelZoom={true}
-          style={{ width: '100%', height: '100%', borderRadius: '12px' }}
-        >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
-          <RecenterMap center={center} />
-          <LocateButton />
-          <MapEventsHandler onIssueClick={() => onIssueClick('')} />
-          {userPosition && <UserLocationMarker position={userPosition} />}
-          {issues.map((issue) => (
-            <Marker
-              key={issue.id}
-              position={[issue.lat, issue.lng]}
-              icon={createPinIcon(L, issue)}
-              eventHandlers={{ click: () => onIssueClick(issue.id) }}
-            >
-              <Popup>
-                <div className="p-1 min-w-[180px]">
-                  <p className="font-semibold text-sm text-slate-900">{issue.title}</p>
-                  {issue.address && <p className="text-xs text-slate-500 mt-0.5">{issue.address}</p>}
-                  <div className="flex gap-1.5 mt-2 flex-wrap">
-                    <StatusBadge status={issue.status} />
-                    <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${PRIORITY_COLORS[issue.priority] || PRIORITY_COLORS.medium}`}>
-                      {issue.priority}
-                    </span>
-                  </div>
-                  {(issue.riskScore ?? 0) > 70 && (
-                    <div className="mt-1.5 flex items-center gap-1 text-[10px] text-red-600 font-medium">
-                      <ExclamationTriangleIcon className="w-3 h-3" />
-                      Risk Score: {issue.riskScore}
-                    </div>
-                  )}
-                  <button onClick={() => onIssueClick(issue.id)} className="w-full mt-2 py-1.5 text-[11px] font-medium text-white bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg hover:opacity-90 transition">
-                    View Details
-                  </button>
-                </div>
-              </Popup>
-            </Marker>
-          ))}
-        </MapContainer>
-      );
-    }
-
-    return { default: LeafletMapInner };
-  },
-  { ssr: false }
-);
-
-const priorityOptions = ['all', 'low', 'medium', 'high', 'critical'];
 
 export default function MapPage() {
   const theme = pageThemes.map;
-  const [activeCategory, setActiveCategory] = useState('All');
-  const [activePriority, setActivePriority] = useState('all');
-  const [activeStatusFilter, setActiveStatusFilter] = useState('__active');
-  const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
-  const [selectedIssue, setSelectedIssue] = useState<string | null>(null);
-  const [mapCenter, setMapCenter] = useState<[number, number]>([20.5937, 78.9629]);
+  const { resolvedTheme } = useTheme();
+  const darkMode = resolvedTheme === 'dark';
+  const { socket, isConnected } = useSocket();
+
   const [issues, setIssues] = useState<MapIssue[]>([]);
+  const [riskZones, setRiskZones] = useState<RiskZone[]>([]);
+  const [hotspots, setHotspots] = useState<{ lat: number; lng: number; predictedRisk: number; issueCount: number }[]>([]);
+  const [duplicatePoints, setDuplicatePoints] = useState<{ id: string; title: string; lat: number; lng: number; similarCount: number }[]>([]);
+  const [communityHealth, setCommunityHealth] = useState<{ lat: number; lng: number; avgCommunity: number; issueCount: number }[]>([]);
+  const [heatData, setHeatData] = useState<[number, number, number][]>([]);
+
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [user, setUser] = useState<UserProfile | null>(null);
-  const [transitioning, setTransitioning] = useState(false);
-  const [showTransitionMenu, setShowTransitionMenu] = useState(false);
+  const [dataError, setDataError] = useState<string | null>(null);
+  const [offline, setOffline] = useState(false);
 
   const [userPosition, setUserPosition] = useState<[number, number] | null>(null);
-  const [locationError, setLocationError] = useState<string | null>(null);
+  const [userAccuracy, setUserAccuracy] = useState<number | null>(null);
+  const [gpsState, setGpsState] = useState<GpsState>('idle');
+  const [gpsErrorMsg, setGpsErrorMsg] = useState<string | null>(null);
+  const [gpsRetries, setGpsRetries] = useState(0);
+  const [userAddress, setUserAddress] = useState<string | null>(null);
+  const watchIdRef = useRef<number | null>(null);
+  const watchStartedRef = useRef(false);
 
-  useEffect(() => {
+  const [filters, setFilters] = useState<MapFilters>(DEFAULT_FILTERS);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [overlays, setOverlays] = useState<OverlayState>(DEFAULT_OVERLAYS);
+  const [overlaysOpen, setOverlaysOpen] = useState(false);
+  const [selectedIssueId, setSelectedIssueId] = useState<string | null>(null);
+  const [flyTo, setFlyTo] = useState<{ lat: number; lng: number; zoom?: number } | null>(null);
+  const [distanceMode, setDistanceMode] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [compassHeading, setCompassHeading] = useState<number | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [showList, setShowList] = useState(false);
+  const [lastSync, setLastSync] = useState<string | null>(null);
+
+  const center: [number, number] = userPosition ?? KOLKATA_CENTER;
+  const lastPosRef = useRef<[number, number] | null>(null);
+  const addressTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /* ---------------- GPS ---------------- */
+  const startWatch = useCallback(() => {
     if (!('geolocation' in navigator)) {
-      setLocationError('Geolocation not supported');
+      setGpsState('unavailable');
+      setGpsErrorMsg('Geolocation is not supported by this browser');
       return;
     }
-    const watchId = navigator.geolocation.watchPosition(
+    if (watchStartedRef.current) return;
+    watchStartedRef.current = true;
+    setGpsState('acquiring');
+    setGpsErrorMsg(null);
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
       (pos) => {
         const newPos: [number, number] = [pos.coords.latitude, pos.coords.longitude];
         setUserPosition(newPos);
-        setMapCenter(newPos);
-        setLocationError(null);
+        setUserAccuracy(pos.coords.accuracy ?? null);
+        setGpsState('active');
+        setGpsErrorMsg(null);
+        setGpsRetries(0);
+
+        const prev = lastPosRef.current;
+        if (prev && haversineKm(prev[0], prev[1], newPos[0], newPos[1]) < 0.05) return;
+        lastPosRef.current = newPos;
+        if (addressTimerRef.current) clearTimeout(addressTimerRef.current);
+        addressTimerRef.current = setTimeout(() => {
+          api
+            .get('/gis/reverse-geocode', { params: { lat: newPos[0], lng: newPos[1] } })
+            .then(({ data }) => {
+              const d = data?.data;
+              if (d?.address || d?.displayName) {
+                setUserAddress(`${d.address || ''}${d.address && d.city ? ', ' : ''}${d.city || ''}`);
+              }
+            })
+            .catch(() => {});
+        }, 3000);
       },
       (err) => {
-        setLocationError(err.code === 1 ? 'Location permission denied' : 'Unable to get location');
-      },
-      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
-    );
-    return () => navigator.geolocation.clearWatch(watchId);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function load() {
-      setLoading(true);
-      setError(null);
-      try {
-        const [issuesRes, profileRes] = await Promise.allSettled([
-          api.get('/issues', { params: { page: 1, limit: 500 } }),
-          api.get('/auth/me'),
-        ]);
-
-        if (cancelled) return;
-
-        if (issuesRes.status === 'fulfilled') {
-          const data = issuesRes.value.data;
-          const raw = data?.data?.data || data?.data || data || [];
-          const list: MapIssue[] = (Array.isArray(raw) ? raw : []).map((item: any) => {
-            let lat = 0;
-            let lng = 0;
-            if (item.location) {
-              if (item.location.type === 'Point' && Array.isArray(item.location.coordinates)) {
-                lng = item.location.coordinates[0];
-                lat = item.location.coordinates[1];
-              } else if (item.location.latitude != null) {
-                lat = item.location.latitude;
-                lng = item.location.longitude;
-              }
-            }
-            if (item.lat != null) lat = item.lat;
-            if (item.lng != null) lng = item.lng;
-            if (item.latitude != null) lat = item.latitude;
-            if (item.longitude != null) lng = item.longitude;
-            return {
-              id: String(item.id ?? item._id ?? ''),
-              title: item.title ?? 'Untitled',
-              description: item.description ?? '',
-              category: item.category ?? 'road_damage',
-              status: item.status ?? 'reported',
-              priority: item.priority ?? 'medium',
-              lat,
-              lng,
-              address: item.address,
-              city: item.city,
-              reporter: typeof item.reportedBy === 'object' ? (item.reportedBy?.name ?? item.reportedBy?.email ?? '') : (item.reporter ?? item.reportedBy ?? ''),
-              createdAt: item.createdAt,
-              completionPercentage: item.completionPercentage ?? item.completion_percentage ?? 0,
-              riskScore: item.riskScore ?? item.risk_score ?? 0,
-              assignedTeam: item.assignedTeam ?? item.assigned_team,
-              assignedDepartment: item.assignedDepartment ?? item.assigned_department,
-              reportedBy: item.reportedBy && typeof item.reportedBy === 'object' ? item.reportedBy : undefined,
-            };
-          });
-          setIssues(list);
+        setGpsRetries((r) => r + 1);
+        if (err.code === 1) {
+          setGpsState('denied');
+          setGpsErrorMsg('Location permission denied. Enable location access in your browser settings to use live GPS features.');
+        } else if (err.code === 3) {
+          setGpsErrorMsg(err.message || 'Location request timed out. Retrying...');
+          if (gpsRetries >= 3) {
+            setGpsState('error');
+            watchStartedRef.current = false;
+          } else {
+            setGpsState('acquiring');
+          }
         } else {
-          setError('Failed to load issues');
+          setGpsErrorMsg(err.message || 'Unable to obtain location');
+          setGpsState('error');
         }
-
-        if (profileRes.status === 'fulfilled') {
-          const pData = profileRes.value.data;
-          setUser(pData?.data?.user || pData?.data || pData?.user || pData);
-        }
-      } catch (err: any) {
-        if (!cancelled) setError(err?.response?.data?.message || 'Failed to load issues');
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-    load();
-    return () => { cancelled = true; };
-  }, []);
+      },
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 12000 }
+    );
+  }, [gpsRetries]);
 
   useEffect(() => {
-    const interval = setInterval(async () => {
-      try {
-        const { data } = await api.get('/issues', { params: { page: 1, limit: 500 } });
-        const raw = data?.data?.data || data?.data || data || [];
-        if (Array.isArray(raw)) {
-          const list: MapIssue[] = raw.map((item: any) => {
-            let lat = 0, lng = 0;
-            if (item.location) {
-              if (item.location.type === 'Point' && Array.isArray(item.location.coordinates)) {
-                lng = item.location.coordinates[0]; lat = item.location.coordinates[1];
-              } else if (item.location.latitude != null) {
-                lat = item.location.latitude; lng = item.location.longitude;
-              }
-            }
-            if (item.lat != null) lat = item.lat;
-            if (item.lng != null) lng = item.lng;
-            if (item.latitude != null) lat = item.latitude;
-            if (item.longitude != null) lng = item.longitude;
-            return {
-              id: String(item.id ?? item._id ?? ''), title: item.title ?? 'Untitled',
-              description: item.description ?? '', category: item.category ?? 'road_damage',
-              status: item.status ?? 'reported', priority: item.priority ?? 'medium',
-              lat, lng, address: item.address, city: item.city,
-              reporter: typeof item.reportedBy === 'object' ? (item.reportedBy?.name ?? '') : (item.reporter ?? ''),
-              createdAt: item.createdAt,
-              completionPercentage: item.completionPercentage ?? 0,
-              riskScore: item.riskScore ?? 0,
-              assignedTeam: item.assignedTeam, assignedDepartment: item.assignedDepartment,
-              reportedBy: item.reportedBy && typeof item.reportedBy === 'object' ? item.reportedBy : undefined,
-            };
-          });
-          setIssues(list);
-        }
-      } catch { /* silent */ }
+    startWatch();
+    return () => {
+      watchStartedRef.current = false;
+      if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current);
+      if (addressTimerRef.current) clearTimeout(addressTimerRef.current);
+    };
+  }, [startWatch]);
+
+  /* Compass */
+  useEffect(() => {
+    const handler = (e: DeviceOrientationEvent) => {
+      let heading = (e as any).webkitCompassHeading;
+      if (heading == null) {
+        heading = e.alpha != null ? 360 - e.alpha : null;
+      }
+      if (heading != null) setCompassHeading(Math.round(heading));
+    };
+    window.addEventListener('deviceorientation', handler, true);
+    return () => window.removeEventListener('deviceorientation', handler, true);
+  }, []);
+
+  /* Offline detection */
+  useEffect(() => {
+    const on = () => setOffline(false);
+    const off = () => setOffline(true);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    setOffline(!navigator.onLine);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
+  }, []);
+
+  /* Fullscreen */
+  useEffect(() => {
+    const onFsChange = () => setFullscreen(!!document.fullscreenElement);
+    document.addEventListener('fullscreenchange', onFsChange);
+    return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  const toggleFullscreen = useCallback(() => {
+    const el = document.getElementById('live-map-container');
+    if (!el) return;
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      el.requestFullscreen().catch(() => {});
+    }
+  }, []);
+
+  /* ---------------- Data ---------------- */
+  const loadExplore = useCallback(async (lat: number, lng: number) => {
+    try {
+      const { data } = await api.get('/gis/explore', {
+        params: { lat, lng, radius: 50, limit: 500 },
+      });
+      const payload = data?.data || data;
+      const list: MapIssue[] = (payload?.issues || [] as RawIssueItem[]).map(toMapIssue).filter((i: MapIssue) => i.lat != null && i.lng != null);
+      setIssues(list);
+      setLastSync(new Date().toISOString());
+      setDataError(null);
+    } catch (e: any) {
+      setDataError(e?.response?.data?.message || 'Failed to load map data');
+    }
+  }, []);
+
+  const loadOverlays = useCallback(async () => {
+    try {
+      const [overlayRes, heatRes] = await Promise.allSettled([
+        api.get('/gis/ai-overlay'),
+        api.get('/gis/heatmap-data'),
+      ]);
+      if (overlayRes.status === 'fulfilled') {
+        const d = overlayRes.value.data?.data || overlayRes.value.data || {};
+        setRiskZones(d.riskZones || []);
+        setHotspots(d.predictedHotspots || []);
+        setDuplicatePoints(d.duplicateGroups || []);
+        setCommunityHealth(d.communityHealth || []);
+      }
+      if (heatRes.status === 'fulfilled') {
+        const hd = heatRes.value.data?.data || heatRes.value.data || {};
+        setHeatData((hd.data || []).map((p: any) => [p.lat, p.lng, p.weight || 1]));
+      }
+    } catch { /* silent */ }
+  }, []);
+
+  const initialLoad = useCallback(async () => {
+    setLoading(true);
+    await loadOverlays();
+    await loadExplore(center[0], center[1]);
+    setLoading(false);
+  }, [loadExplore, loadOverlays, center]);
+
+  useEffect(() => {
+    initialLoad();
+    const interval = setInterval(() => {
+      if (!socket?.connected) loadExplore(center[0], center[1]);
     }, 30000);
     return () => clearInterval(interval);
+  }, [initialLoad, socket, center]);
+
+  /* ---------------- Real-time ---------------- */
+  const applyIssuePatch = useCallback((msg: any) => {
+    const id = String(msg?.issueId || '');
+    if (!id) return;
+    const type = msg?.type;
+
+    if (type === 'removed') {
+      setIssues((prev) => prev.filter((i) => i.id !== id));
+      setSelectedIssueId((sel) => (sel === id ? null : sel));
+      return;
+    }
+
+    setIssues((prev) => {
+      const existing = prev.find((i) => i.id === id);
+      if (!existing) {
+        if (type === 'created' && msg.latitude != null && msg.longitude != null) {
+          const created: MapIssue = {
+            id,
+            title: msg.title || 'New issue',
+            description: '',
+            category: msg.category || 'other',
+            priority: msg.priority || 'medium',
+            status: msg.status || 'reported',
+            lat: Number(msg.latitude),
+            lng: Number(msg.longitude),
+            distanceKm: null,
+            riskScore: null,
+            communityScore: null,
+            upvotes: 0,
+            downvotes: 0,
+            isUrgent: msg.priority === 'emergency' || msg.priority === 'critical',
+            completionPercentage: 0,
+            createdAt: msg.createdAt,
+            address: '',
+            ward: null,
+            pincode: null,
+            department: null,
+            reporter: null,
+            aiAnalysis: null,
+            verification: null,
+          };
+          return [created, ...prev];
+        }
+        return prev;
+      }
+      return prev.map((i) => {
+        if (i.id !== id) return i;
+        const next = { ...i };
+        if (msg.status) next.status = msg.status;
+        if (msg.priority) next.priority = msg.priority;
+        if (msg.title) next.title = msg.title;
+        if (msg.completionPercentage != null) next.completionPercentage = Number(msg.completionPercentage);
+        if (msg.upvotes != null) next.upvotes = Number(msg.upvotes);
+        if (msg.downvotes != null) next.downvotes = Number(msg.downvotes);
+        if (msg.isResolved) next.status = 'resolved';
+        return next;
+      });
+    });
   }, []);
 
-  const filteredIssues = issues.filter((issue) => {
-    if (!statusMatchesFilter(issue.status, activeStatusFilter)) return false;
-    if (activeCategory !== 'All' && issue.category !== catToInternal[activeCategory]) return false;
-    if (activePriority !== 'all' && issue.priority !== activePriority) return false;
-    return true;
-  });
+  useEffect(() => {
+    if (!socket) return;
+    const handler = (msg: any) => {
+      applyIssuePatch(msg);
+      if (msg?.type === 'created') loadExplore(center[0], center[1]);
+    };
+    socket.on('issue:update', handler);
+    return () => {
+      socket.off('issue:update', handler);
+    };
+  }, [socket, applyIssuePatch, loadExplore, center]);
 
-  const selectedIssueData = selectedIssue ? issues.find((i) => i.id === selectedIssue) : null;
+  /* ---------------- Derived ---------------- */
+  const departments = useMemo(() => {
+    const set = new Set<string>();
+    issues.forEach((i) => {
+      if (i.department?.name) set.add(i.department.name);
+    });
+    return Array.from(set).sort();
+  }, [issues]);
 
-  const handlePinClick = (id: string) => {
-    setSelectedIssue(id || null);
-    setShowTransitionMenu(false);
-  };
+  const filteredIssues = useMemo(() => {
+    const sinceMs =
+      filters.since === '24h' ? 86400000
+      : filters.since === '7d' ? 7 * 86400000
+      : filters.since === '30d' ? 30 * 86400000
+      : filters.since === '90d' ? 90 * 86400000
+      : null;
+    return issues.filter((i) => {
+      if (!statusMatchesGroup(i.status, filters.status)) return false;
+      if (filters.category !== 'all' && i.category !== filters.category) return false;
+      if (filters.priority !== 'all' && i.priority !== filters.priority) return false;
+      if (filters.department !== 'all' && i.department?.name !== filters.department) return false;
+      if (filters.radiusKm && i.distanceKm != null && i.distanceKm > filters.radiusKm) return false;
+      if (sinceMs != null && i.createdAt && Date.now() - new Date(i.createdAt).getTime() > sinceMs) return false;
+      if (filters.verifiedOnly && !['verified', 'resolved', 'closed'].includes(i.status)) return false;
+      if (filters.aiVerifiedOnly && !i.verification?.aiVerified) return false;
+      if (filters.emergencyOnly && i.priority !== 'emergency' && i.priority !== 'critical' && !i.isUrgent) return false;
+      return true;
+    });
+  }, [issues, filters]);
 
-  const handleTransitionStatus = async (newStatus: string) => {
-    if (!selectedIssueData || transitioning) return;
-    setTransitioning(true);
-    try {
-      await api.patch(`/issues/${selectedIssueData.id}/transition`, { status: newStatus });
-      setIssues((prev) =>
-        prev.map((i) => (i.id === selectedIssueData.id ? { ...i, status: newStatus } : i))
-      );
-      setShowTransitionMenu(false);
-    } catch (err: any) {
-      alert(err?.response?.data?.message || 'Failed to transition status');
-    } finally {
-      setTransitioning(false);
+  const selectedIssue = selectedIssueId ? issues.find((i) => i.id === selectedIssueId) ?? null : null;
+
+  const handleSearchSelect = useCallback((sel: SearchSelection) => {
+    if (sel.kind === 'place' && sel.lat != null && sel.lng != null) {
+      setFlyTo({ lat: sel.lat, lng: sel.lng, zoom: 16 });
+    } else if (sel.kind === 'issue' && sel.issueId) {
+      const found = issues.find((i) => i.id === sel.issueId);
+      if (found && found.lat != null && found.lng != null) {
+        setSelectedIssueId(found.id);
+        setFlyTo({ lat: found.lat, lng: found.lng, zoom: 16 });
+      } else {
+        api
+          .get(`/issues/${sel.issueId}`)
+          .then(({ data }) => {
+            const item = data?.data || data;
+            if (item?.id) {
+              const mi = toMapIssue(item);
+              setIssues((prev) => (prev.some((x) => x.id === mi.id) ? prev : [mi, ...prev]));
+              setSelectedIssueId(mi.id);
+              if (mi.lat != null && mi.lng != null) setFlyTo({ lat: mi.lat, lng: mi.lng, zoom: 16 });
+            }
+          })
+          .catch(() => {});
+      }
+    } else if (sel.kind === 'department' && sel.name) {
+      setFilters((f) => ({ ...f, department: sel.name ?? 'all' }));
+      setFiltersOpen(true);
     }
-  };
+  }, [issues]);
 
-  const isAdmin = user?.role === 'super_admin' || user?.role === 'municipal_admin' || user?.role === 'department_admin';
+  const gpsPill = (() => {
+    switch (gpsState) {
+      case 'active':
+        return { cls: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20', dot: 'bg-emerald-500 animate-pulse', text: 'GPS Active' };
+      case 'acquiring':
+        return { cls: 'text-slate-500 bg-slate-100 dark:bg-slate-800', dot: 'bg-slate-400 animate-pulse', text: 'Acquiring GPS...' };
+      case 'denied':
+        return { cls: 'text-red-600 bg-red-50 dark:bg-red-900/20', dot: 'bg-red-500', text: 'Location blocked' };
+      case 'unavailable':
+        return { cls: 'text-amber-600 bg-amber-50 dark:bg-amber-900/20', dot: 'bg-amber-500', text: 'No GPS support' };
+      case 'error':
+        return { cls: 'text-amber-600 bg-amber-50 dark:bg-amber-900/20', dot: 'bg-amber-500', text: 'GPS unavailable' };
+      default:
+        return { cls: 'text-slate-500 bg-slate-100 dark:bg-slate-800', dot: 'bg-slate-400', text: 'GPS idle' };
+    }
+  })();
+
+  const overlayToggles: { key: keyof OverlayState; label: string; icon: React.ReactNode }[] = [
+    { key: 'heatmap', label: 'Heatmap', icon: <FireIcon className="w-3.5 h-3.5" /> },
+    { key: 'riskZones', label: 'Risk Zones', icon: <ShieldExclamationIcon className="w-3.5 h-3.5" /> },
+    { key: 'predicted', label: 'AI Predicted', icon: <SparklesIcon className="w-3.5 h-3.5" /> },
+    { key: 'duplicates', label: 'Duplicates', icon: <BoltIcon className="w-3.5 h-3.5" /> },
+    { key: 'community', label: 'Community', icon: <UsersIcon className="w-3.5 h-3.5" /> },
+  ];
 
   return (
     <AppShell>
       <div className={`${theme.background} min-h-full`}>
         <div className="flex flex-col min-h-[calc(100vh-4rem)]">
           {/* Header */}
-          <div className="p-4 md:p-6 pb-3">
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="p-4 md:p-5 pb-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className={`${theme.gradient} rounded-xl p-2.5 text-white`}>
                   <MapIcon className="w-5 h-5" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold font-heading text-slate-900 dark:text-white">Live Issue Map</h1>
+                  <h1 className="text-xl font-bold font-heading text-slate-900 dark:text-white">Live GPS Map</h1>
                   <p className="text-xs text-slate-500">
-                    {loading ? 'Loading issues...' : `${filteredIssues.length} issues shown`}
+                    {loading ? 'Loading...' : `${filteredIssues.length} issues in view`}
+                    {lastSync && !loading && ` · synced ${new Date(lastSync).toLocaleTimeString()}`}
+                    {!isConnected && !loading && ' · ⚠ live sync off'}
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {userPosition ? (
-                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20 px-2.5 py-1 rounded-full">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> GPS Active
-                  </span>
-                ) : locationError ? (
-                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-amber-600 bg-amber-50 dark:bg-amber-900/20 px-2.5 py-1 rounded-full">
-                    {locationError}
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full">
-                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400 animate-pulse" /> Acquiring GPS...
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={`flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-full ${gpsPill.cls}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${gpsPill.dot}`} /> {gpsPill.text}
+                </span>
+                {compassHeading != null && (
+                  <span className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-full" title="Compass heading">
+                    <span className="inline-block transition-transform duration-200" style={{ transform: `rotate(${compassHeading}deg)` }}>🧭</span>
+                    {compassHeading}°
                   </span>
                 )}
-                <button onClick={() => setViewMode('map')} className={`p-2 rounded-lg transition-colors ${viewMode === 'map' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
-                  <Squares2X2Icon className="w-5 h-5" />
-                </button>
-                <button onClick={() => setViewMode('list')} className={`p-2 rounded-lg transition-colors ${viewMode === 'list' ? 'bg-emerald-100 text-emerald-700' : 'text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
-                  <ListBulletIcon className="w-5 h-5" />
-                </button>
+                <span className={`flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-full ${isConnected ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-900/20' : 'text-slate-500 bg-slate-100 dark:bg-slate-800'}`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                  {isConnected ? 'Live' : 'Polling'}
+                </span>
               </div>
-            </motion.div>
-          </div>
+            </div>
 
-          {/* Status Filter Chips */}
-          <div className="px-4 md:px-6 pb-2">
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-              {statusFilterGroups.map((group) => (
-                <button
-                  key={group.value}
-                  onClick={() => setActiveStatusFilter(group.value)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
-                    activeStatusFilter === group.value
-                      ? 'bg-emerald-600 text-white shadow-md'
-                      : 'bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
-                  }`}
+            {/* Search */}
+            <div className="mt-3 max-w-2xl">
+              <MapSearchBox onSelect={handleSearchSelect} onLoadingChange={setSearchLoading} />
+            </div>
+
+            {/* GPS address + banners */}
+            <AnimatePresence>
+              {userAddress && gpsState === 'active' && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+                  className="mt-2 inline-flex items-center gap-1.5 text-[11px] text-slate-600 dark:text-slate-300 bg-white/70 dark:bg-slate-800/70 backdrop-blur rounded-full px-3 py-1 border border-slate-200 dark:border-slate-700"
                 >
-                  {group.label}
-                  {group.value === '__active' && !loading && (
-                    <span className="ml-1 text-[10px] opacity-75">
-                      ({issues.filter((i) => !INACTIVE_STATUSES.has(i.status)).length})
-                    </span>
-                  )}
-                </button>
-              ))}
-            </div>
+                  <MapPinIcon className="w-3 h-3 text-emerald-500" /> {userAddress}
+                </motion.div>
+              )}
+              {gpsState === 'denied' && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+                  className="mt-2 flex items-center gap-2 text-[11px] text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl px-3 py-2"
+                >
+                  <span className="flex-1">{gpsErrorMsg} Tap the 🔒 icon in your browser address bar → Location → Allow, then retry.</span>
+                  <button onClick={() => { watchStartedRef.current = false; startWatch(); }} className="font-semibold text-red-700 dark:text-red-300 hover:underline shrink-0">Retry GPS</button>
+                </motion.div>
+              )}
+              {gpsState === 'error' && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+                  className="mt-2 flex items-center gap-2 text-[11px] text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl px-3 py-2"
+                >
+                  <span className="flex-1">{gpsErrorMsg} Showing city-wide view instead.</span>
+                  <button onClick={() => { watchStartedRef.current = false; startWatch(); }} className="font-semibold hover:underline shrink-0">Retry GPS</button>
+                </motion.div>
+              )}
+              {offline && (
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+                  className="mt-2 flex items-center gap-2 text-[11px] text-slate-700 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-xl px-3 py-2"
+                >
+                  <WifiIcon className="w-3.5 h-3.5" />
+                  <span>You are offline. Map shows last synced data.</span>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
-          {/* Category Filters */}
-          <div className="px-4 md:px-6 pb-2">
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
-              {filterCategories.map((cat) => (
-                <button key={cat} onClick={() => setActiveCategory(cat)}
-                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${activeCategory === cat ? 'bg-emerald-600 text-white shadow-md' : 'bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
-                  {cat}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Priority Filters */}
-          <div className="px-4 md:px-6 pb-3 flex flex-col sm:flex-row gap-2">
-            <div className="flex gap-1.5 overflow-x-auto scrollbar-thin">
-              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider self-center mr-1 flex items-center gap-1">
-                <FunnelIcon className="w-3 h-3" />
-                Priority
-              </span>
-              {priorityOptions.map((p) => (
-                <button key={p} onClick={() => setActivePriority(p)}
-                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap transition-all ${
-                    activePriority === p
-                      ? p === 'critical' ? 'bg-red-600 text-white shadow-md' :
-                        p === 'high' ? 'bg-orange-500 text-white shadow-md' :
-                        p === 'medium' ? 'bg-yellow-500 text-white shadow-md' :
-                        p === 'low' ? 'bg-emerald-500 text-white shadow-md' :
-                        'bg-slate-600 text-white shadow-md'
-                      : 'bg-white/80 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700'
-                  }`}>
-                  {p === 'all' ? 'All' : p.charAt(0).toUpperCase() + p.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Map / List Content */}
-          <div className="flex-1 px-4 md:px-6 pb-4 min-h-0">
-            {viewMode === 'map' ? (
-              <div className="h-full rounded-2xl overflow-hidden relative bg-slate-200 dark:bg-slate-800" style={{ minHeight: 'calc(100vh - 18rem)', width: '100%' }}>
-                {loading ? (
-                  <div className="h-full w-full flex items-center justify-center">
-                    <div className="flex flex-col items-center gap-3">
-                      <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-                      <p className="text-slate-500 text-sm">Loading issues...</p>
-                    </div>
-                  </div>
-                ) : error ? (
-                  <div className="h-full w-full flex items-center justify-center">
-                    <div className="text-center">
-                      <p className="text-red-500 text-sm font-medium">{error}</p>
-                      <button onClick={() => window.location.reload()} className="mt-2 text-xs text-emerald-600 hover:underline">Retry</button>
-                    </div>
-                  </div>
-                ) : (
-                  <Suspense fallback={
-                    <div className="h-full w-full flex items-center justify-center">
-                      <div className="text-slate-500 text-sm">Loading map...</div>
-                    </div>
-                  }>
-                    <DynamicLeafletMap center={mapCenter} issues={filteredIssues} onIssueClick={handlePinClick} userPosition={userPosition} />
-                  </Suspense>
-                )}
-
-                {/* Status Legend */}
-                <div className="absolute bottom-4 left-4 z-[1000] bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-xl p-3 text-xs space-y-1 shadow-lg max-h-[40vh] overflow-y-auto">
-                  <p className="font-semibold text-slate-900 dark:text-white mb-1">Status Colors</p>
-                  {[
-                    ['New', 'bg-blue-500'],
-                    ['Verifying', 'bg-purple-500'],
-                    ['Assigned', 'bg-orange-500'],
-                    ['Working', 'bg-yellow-500'],
-                    ['Awaiting AI', 'bg-cyan-500'],
-                    ['Awaiting Confirm', 'bg-green-500'],
-                    ['Resolved', 'bg-emerald-500'],
-                    ['Closed', 'bg-gray-500'],
-                  ].map(([label, dotClass]) => (
-                    <div key={label} className="flex items-center gap-2">
-                      <div className={`w-3 h-3 rounded-full ${dotClass}`} />
-                      <span className="text-slate-600 dark:text-slate-400">{label}</span>
-                    </div>
-                  ))}
-                  <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full border-2 border-red-500 animate-pulse" />
-                      <span className="text-slate-600 dark:text-slate-400">High Risk</span>
-                    </div>
+          {/* Map */}
+          <div className="flex-1 px-4 md:px-5 pb-4 min-h-0">
+            <div
+              id="live-map-container"
+              className="relative rounded-2xl overflow-hidden bg-slate-200 dark:bg-slate-800 border border-slate-200 dark:border-slate-700"
+              style={{ minHeight: 'calc(100vh - 17rem)', width: '100%', height: fullscreen ? '100vh' : undefined }}
+            >
+              {loading ? (
+                <div className="h-full w-full flex items-center justify-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                    <p className="text-slate-500 text-sm">Loading map data...</p>
                   </div>
                 </div>
-
-                {/* Issue Detail Panel */}
-                <AnimatePresence>
-                  {selectedIssueData && (
-                    <motion.div
-                      initial={{ x: 20, opacity: 0 }}
-                      animate={{ x: 0, opacity: 1 }}
-                      exit={{ x: 20, opacity: 0 }}
-                      transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                      className="absolute top-4 right-4 bottom-4 z-[1000] w-80 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden"
-                    >
-                      {/* Panel Header */}
-                      <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-sm font-bold text-slate-900 dark:text-white truncate">{selectedIssueData.title}</h3>
-                          {selectedIssueData.address && (
-                            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1 truncate">
-                              <MapPinIcon className="w-3 h-3 flex-shrink-0" /> {selectedIssueData.address}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => setSelectedIssue(null)}
-                          className="ml-2 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition text-slate-400 hover:text-slate-600"
-                        >
-                          <XMarkIcon className="w-4 h-4" />
-                        </button>
-                      </div>
-
-                      {/* Panel Body */}
-                      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                        {/* Status & Priority */}
-                        <div className="flex flex-wrap gap-1.5">
-                          <StatusBadge status={selectedIssueData.status} />
-                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${PRIORITY_COLORS[selectedIssueData.priority] || PRIORITY_COLORS.medium}`}>
-                            {selectedIssueData.priority}
-                          </span>
-                          <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300">
-                            {selectedIssueData.category.replace(/_/g, ' ')}
-                          </span>
-                        </div>
-
-                        {/* Description */}
-                        {selectedIssueData.description && (
-                          <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">{selectedIssueData.description}</p>
-                        )}
-
-                        {/* Completion */}
-                        <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3">
-                          <div className="flex items-center justify-between mb-2">
-                            <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Progress</span>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <ProgressRing percentage={selectedIssueData.completionPercentage ?? 0} />
-                            <div className="flex-1">
-                              <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
-                                <div
-                                  className="bg-emerald-500 h-2 rounded-full transition-all duration-500"
-                                  style={{ width: `${Math.min(100, selectedIssueData.completionPercentage ?? 0)}%` }}
-                                />
-                              </div>
-                              <p className="text-[10px] text-slate-500 mt-1">
-                                {selectedIssueData.completionPercentage ?? 0}% complete
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Risk Score */}
-                        {(selectedIssueData.riskScore ?? 0) > 0 && (
-                          <div className={`rounded-lg p-3 ${(selectedIssueData.riskScore ?? 0) > 70 ? 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800' : 'bg-slate-50 dark:bg-slate-900/50'}`}>
-                            <div className="flex items-center gap-2">
-                              {(selectedIssueData.riskScore ?? 0) > 70 && <ExclamationTriangleIcon className="w-4 h-4 text-red-500" />}
-                              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Risk Score</span>
-                            </div>
-                            <p className={`text-lg font-bold mt-1 ${(selectedIssueData.riskScore ?? 0) > 70 ? 'text-red-600' : 'text-slate-700 dark:text-slate-300'}`}>
-                              {selectedIssueData.riskScore}
-                            </p>
-                            {(selectedIssueData.riskScore ?? 0) > 70 && (
-                              <p className="text-[10px] text-red-500 mt-0.5">High risk - requires immediate attention</p>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Details */}
-                        <div className="space-y-2 text-[11px] text-slate-500">
-                          {selectedIssueData.reportedBy?.name && (
-                            <div className="flex justify-between">
-                              <span>Reported by</span>
-                              <span className="font-medium text-slate-700 dark:text-slate-300">{selectedIssueData.reportedBy.name}</span>
-                            </div>
-                          )}
-                          {!selectedIssueData.reportedBy?.name && selectedIssueData.reporter && (
-                            <div className="flex justify-between">
-                              <span>Reported by</span>
-                              <span className="font-medium text-slate-700 dark:text-slate-300">{selectedIssueData.reporter}</span>
-                            </div>
-                          )}
-                          {selectedIssueData.createdAt && (
-                            <div className="flex justify-between">
-                              <span>Date</span>
-                              <span className="font-medium text-slate-700 dark:text-slate-300">
-                                {new Date(selectedIssueData.createdAt).toLocaleDateString()}
-                              </span>
-                            </div>
-                          )}
-                          {(selectedIssueData.assignedTeam || selectedIssueData.assignedDepartment) && (
-                            <div className="flex justify-between">
-                              <span>Team</span>
-                              <span className="font-medium text-slate-700 dark:text-slate-300">
-                                {selectedIssueData.assignedDepartment || selectedIssueData.assignedTeam}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Status Transition (Admin) */}
-                        {isAdmin && STATUS_TRANSITIONS[selectedIssueData.status]?.length > 0 && (
-                          <div className="bg-slate-50 dark:bg-slate-900/50 rounded-lg p-3">
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">Next Statuses</span>
-                              <button
-                                onClick={() => setShowTransitionMenu(!showTransitionMenu)}
-                                className="text-[10px] text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1"
-                              >
-                                <ArrowPathIcon className="w-3 h-3" />
-                                {showTransitionMenu ? 'Cancel' : 'Transition'}
-                              </button>
-                            </div>
-                            <AnimatePresence>
-                              {showTransitionMenu ? (
-                                <motion.div
-                                  initial={{ height: 0, opacity: 0 }}
-                                  animate={{ height: 'auto', opacity: 1 }}
-                                  exit={{ height: 0, opacity: 0 }}
-                                  className="space-y-1.5 overflow-hidden"
-                                >
-                                  {STATUS_TRANSITIONS[selectedIssueData.status].map((nextStatus) => (
-                                    <button
-                                      key={nextStatus}
-                                      onClick={() => handleTransitionStatus(nextStatus)}
-                                      disabled={transitioning}
-                                      className="w-full text-left px-3 py-2 rounded-lg text-xs font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition disabled:opacity-50 flex items-center justify-between"
-                                    >
-                                      <StatusBadge status={nextStatus} />
-                                      {transitioning && <span className="w-3 h-3 border border-emerald-500 border-t-transparent rounded-full animate-spin" />}
-                                    </button>
-                                  ))}
-                                </motion.div>
-                              ) : (
-                                <div className="flex flex-wrap gap-1">
-                                  {STATUS_TRANSITIONS[selectedIssueData.status].map((nextStatus) => (
-                                    <StatusBadge key={nextStatus} status={nextStatus} />
-                                  ))}
-                                </div>
-                              )}
-                            </AnimatePresence>
-                          </div>
-                        )}
-
-                        {/* View Full Details */}
-                        <button
-                          onClick={() => {
-                            window.location.href = `/issues/${selectedIssueData.id}`;
-                          }}
-                          className="w-full py-2.5 text-xs font-medium text-white bg-gradient-to-r from-emerald-600 to-teal-600 rounded-lg hover:opacity-90 transition"
-                        >
-                          View Full Details
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ) : (
-              /* List View */
-              <div className="space-y-3">
-                {loading ? (
-                  <div className="flex flex-col items-center gap-3 py-12">
-                    <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-                    <p className="text-slate-500 text-sm">Loading issues...</p>
+              ) : dataError ? (
+                <div className="h-full w-full flex items-center justify-center">
+                  <div className="text-center">
+                    <p className="text-red-500 text-sm font-medium">{dataError}</p>
+                    <button onClick={() => initialLoad()} className="mt-2 text-xs text-emerald-600 hover:underline">Retry</button>
                   </div>
-                ) : error ? (
-                  <div className="text-center py-12">
-                    <p className="text-red-500 text-sm font-medium">{error}</p>
-                    <button onClick={() => window.location.reload()} className="mt-2 text-xs text-emerald-600 hover:underline">Retry</button>
-                  </div>
-                ) : filteredIssues.length === 0 ? (
-                  <div className="text-center py-12 text-slate-400 text-sm">No issues match your filters</div>
-                ) : (
-                  filteredIssues.map((issue, i) => (
-                    <motion.div
-                      key={issue.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.05 * i }}
-                      className="glass-card p-4 cursor-pointer hover:shadow-lg transition-all"
-                      onClick={() => handlePinClick(issue.id)}
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="text-2xl">{getCategoryIcon(issue.category)}</span>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold text-slate-900 dark:text-white truncate">{issue.title}</p>
-                            {(issue.riskScore ?? 0) > 70 && (
-                              <ExclamationTriangleIcon className="w-4 h-4 text-red-500 flex-shrink-0" />
-                            )}
-                          </div>
-                          <p className="text-xs text-slate-500 flex items-center gap-1 truncate">
-                            <MapPinIcon className="w-3 h-3 flex-shrink-0" />
-                            {issue.address || issue.city || 'Location unavailable'}
-                          </p>
-                        </div>
-                        <div className="flex flex-col gap-1 items-end flex-shrink-0">
-                          <StatusBadge status={issue.status} />
-                          <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${PRIORITY_COLORS[issue.priority] || PRIORITY_COLORS.medium}`}>
-                            {issue.priority}
-                          </span>
-                        </div>
-                      </div>
-                      {(issue.completionPercentage ?? 0) > 0 && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <div className="flex-1 bg-slate-200 dark:bg-slate-700 rounded-full h-1.5">
-                            <div
-                              className="bg-emerald-500 h-1.5 rounded-full"
-                              style={{ width: `${Math.min(100, issue.completionPercentage ?? 0)}%` }}
-                            />
-                          </div>
-                          <span className="text-[10px] text-slate-500 flex-shrink-0">{issue.completionPercentage}%</span>
-                        </div>
-                      )}
-                    </motion.div>
-                  ))
+                </div>
+              ) : (
+                <Suspense fallback={
+                  <div className="h-full w-full flex items-center justify-center text-slate-500 text-sm">Loading map...</div>
+                }>
+                  <DynamicMapView
+                    center={center}
+                    issues={filteredIssues}
+                    userPosition={userPosition}
+                    userAccuracy={userAccuracy}
+                    darkMode={darkMode}
+                    overlays={overlays}
+                    heatData={heatData}
+                    riskZones={riskZones}
+                    hotspots={hotspots}
+                    duplicatePoints={duplicatePoints}
+                    communityHealth={communityHealth}
+                    selectedIssueId={selectedIssueId}
+                    onIssueClick={(id) => setSelectedIssueId(id || null)}
+                    flyTo={flyTo}
+                    onFlyToConsumed={() => setFlyTo(null)}
+                    distanceMode={distanceMode}
+                    onToggleDistanceMode={() => setDistanceMode((d) => !d)}
+                  />
+                </Suspense>
+              )}
+
+              {/* Filters panel */}
+              <MapFiltersPanel
+                open={filtersOpen}
+                onClose={() => setFiltersOpen(false)}
+                filters={filters}
+                onChange={setFilters}
+                departments={departments}
+                activeCount={filteredIssues.length}
+              />
+
+              {/* Overlays menu */}
+              <AnimatePresence>
+                {overlaysOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="absolute top-2 right-14 z-[1100] w-48 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 p-2"
+                  >
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 px-2 pt-1 pb-1.5">AI Overlays</p>
+                    {overlayToggles.map((t) => (
+                      <button
+                        key={t.key}
+                        onClick={() => setOverlays((o) => ({ ...o, [t.key]: !o[t.key] }))}
+                        className="w-full flex items-center justify-between px-2 py-1.5 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-xs text-slate-700 dark:text-slate-200"
+                      >
+                        <span className="flex items-center gap-1.5">{t.icon} {t.label}</span>
+                        <span className={`w-8 h-[18px] rounded-full transition-colors flex items-center px-0.5 ${overlays[t.key] ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-600'}`}>
+                          <span className={`w-3.5 h-3.5 bg-white rounded-full shadow transition-transform ${overlays[t.key] ? 'translate-x-[18px]' : ''}`} />
+                        </span>
+                      </button>
+                    ))}
+                    <div className="mt-1 pt-1.5 border-t border-slate-200 dark:border-slate-700 px-2">
+                      <span className="text-[9px] text-slate-400">Powered by AI · risk, hotspots, duplicates</span>
+                    </div>
+                  </motion.div>
                 )}
+              </AnimatePresence>
+
+              {/* FABs */}
+              <div className="absolute right-2 top-2 z-[1000] flex flex-col gap-2">
+                <button onClick={() => setFiltersOpen((o) => !o)} className="w-9 h-9 rounded-xl bg-white/95 dark:bg-slate-800/95 backdrop-blur shadow-lg flex items-center justify-center text-slate-700 dark:text-slate-200 hover:scale-105 transition-all border border-slate-200 dark:border-slate-700" title="Filters">
+                  <FunnelIcon className="w-4 h-4" />
+                </button>
+                <button onClick={() => setOverlaysOpen((o) => !o)} className={`w-9 h-9 rounded-xl backdrop-blur shadow-lg flex items-center justify-center hover:scale-105 transition-all border ${Object.values(overlays).some(Boolean) ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white/95 dark:bg-slate-800/95 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'}`} title="AI Overlays">
+                  <SparklesIcon className="w-4 h-4" />
+                </button>
+                <button onClick={toggleFullscreen} className="w-9 h-9 rounded-xl bg-white/95 dark:bg-slate-800/95 backdrop-blur shadow-lg flex items-center justify-center text-slate-700 dark:text-slate-200 hover:scale-105 transition-all border border-slate-200 dark:border-slate-700" title="Fullscreen">
+                  {fullscreen ? <ArrowsPointingInIcon className="w-4 h-4" /> : <ArrowsPointingOutIcon className="w-4 h-4" />}
+                </button>
+                <button onClick={() => setDistanceMode((d) => !d)} className={`w-9 h-9 rounded-xl backdrop-blur shadow-lg flex items-center justify-center hover:scale-105 transition-all border ${distanceMode ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white/95 dark:bg-slate-800/95 text-slate-700 dark:text-slate-200 border-slate-200 dark:border-slate-700'}`} title="Measure distance">
+                  <ScaleIcon className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => userPosition && setFlyTo({ lat: userPosition[0], lng: userPosition[1], zoom: 16 })}
+                  className={`w-9 h-9 rounded-xl backdrop-blur shadow-lg flex items-center justify-center hover:scale-105 transition-all border ${userPosition ? 'bg-white/95 dark:bg-slate-800/95 text-emerald-600 border-slate-200 dark:border-slate-700' : 'bg-slate-100 dark:bg-slate-800 text-slate-300 border-slate-200 dark:border-slate-700 cursor-not-allowed'}`}
+                  title="Recenter on me"
+                >
+                  <ViewfinderCircleIcon className="w-4 h-4" />
+                </button>
               </div>
-            )}
+
+              {/* Bottom-left info */}
+              <div className="absolute bottom-3 left-2 z-[1000] flex flex-col gap-1.5">
+                {searchLoading && (
+                  <span className="text-[10px] text-slate-500 bg-white/90 dark:bg-slate-800/90 backdrop-blur rounded-lg px-2.5 py-1 shadow">Searching...</span>
+                )}
+                <div className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl rounded-xl px-3 py-2 text-[10px] shadow-lg max-h-[30vh] overflow-y-auto border border-slate-200 dark:border-slate-700">
+                  <p className="font-semibold text-slate-900 dark:text-white mb-1">Legend</p>
+                  <div className="grid grid-cols-1 gap-1">
+                    {[['New', '#3b82f6'], ['Verifying', '#a855f7'], ['Assigned', '#f97316'], ['Working', '#eab308'], ['AI Check', '#06b6d4'], ['Confirm', '#34d399'], ['Resolved', '#10b981'], ['Closed', '#6b7280']].map(([label, color]) => (
+                      <div key={label} className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+                        <span className="text-slate-600 dark:text-slate-400">{label}</span>
+                      </div>
+                    ))}
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <span className="w-2 h-2 rounded-full border border-red-500 animate-pulse" />
+                      <span className="text-slate-600 dark:text-slate-400">High risk / urgent</span>
+                    </div>
+                    {overlays.duplicates && (
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className="w-2 h-2 rounded-full bg-red-600" />
+                        <span className="text-slate-600 dark:text-slate-400">Possible duplicate</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* List drawer */}
+              <AnimatePresence>
+                {showList && (
+                  <motion.div
+                    initial={{ x: -260 }} animate={{ x: 0 }} exit={{ x: -260 }}
+                    className="absolute bottom-2 left-2 z-[1100] w-64 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-xl shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col overflow-hidden"
+                  >
+                    <div className="p-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
+                      <p className="text-xs font-bold text-slate-900 dark:text-white">Issues List ({filteredIssues.length})</p>
+                      <button onClick={() => setShowList(false)} className="p-1 text-slate-400 hover:text-slate-600"><XMarkIcon className="w-3.5 h-3.5" /></button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto max-h-[40vh]">
+                      {filteredIssues.length === 0 ? (
+                        <p className="text-xs text-slate-400 p-4">No issues match filters</p>
+                      ) : (
+                        filteredIssues.slice(0, 100).map((i) => (
+                          <button
+                            key={i.id}
+                            onClick={() => { setSelectedIssueId(i.id); setShowList(false); }}
+                            className="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-start gap-2"
+                          >
+                            <span className="text-sm leading-none mt-0.5">{categoryEmoji(i.category)}</span>
+                            <span className="min-w-0">
+                              <span className="block text-[11px] font-medium text-slate-800 dark:text-slate-100 truncate">{i.title}</span>
+                              <span className="block text-[9px] text-slate-400">
+                                {statusLabel(i.status)} · {priorityLabel(i.priority)}
+                                {i.distanceKm != null && ` · ${formatDistance(i.distanceKm)}`}
+                              </span>
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* List toggle button */}
+              <button
+                onClick={() => setShowList((s) => !s)}
+                className="absolute bottom-2 right-2 z-[1000] flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white/95 dark:bg-slate-800/95 backdrop-blur shadow-lg text-xs font-medium text-slate-700 dark:text-slate-200 hover:scale-105 transition-all border border-slate-200 dark:border-slate-700"
+              >
+                {showList ? <Squares2X2Icon className="w-3.5 h-3.5" /> : <ListBulletIcon className="w-3.5 h-3.5" />}
+                {filteredIssues.length}
+              </button>
+
+              {/* Detail panel */}
+              <AnimatePresence>
+                {selectedIssue && <IssueDetailPanel issue={selectedIssue} onClose={() => setSelectedIssueId(null)} />}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       </div>

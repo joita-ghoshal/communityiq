@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Issue, IssueStatus, IssuePriority } from '../../database/entities/issue.entity';
 import { IssueTimeline, TimelineAction } from '../../database/entities/issue-timeline.entity';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 const VALID_TRANSITIONS: Record<IssueStatus, IssueStatus[]> = {
   [IssueStatus.REPORTED]: [IssueStatus.AI_ANALYZING, IssueStatus.VERIFIED, IssueStatus.CLOSED, IssueStatus.INVALID],
@@ -51,7 +52,22 @@ export class IssueLifecycleService {
     private readonly issueRepo: Repository<Issue>,
     @InjectRepository(IssueTimeline)
     private readonly timelineRepo: Repository<IssueTimeline>,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
+
+  private emitStatusEvent(issue: Issue, oldStatus: IssueStatus, newStatus: IssueStatus, userId?: string) {
+    this.notificationsGateway.sendIssueUpdate(issue.id, {
+      type: 'status',
+      from: oldStatus,
+      to: newStatus,
+      status: newStatus,
+      completionPercentage: issue.completionPercentage,
+      title: issue.title,
+      priority: issue.priority,
+      updatedById: userId,
+      isResolved: [IssueStatus.RESOLVED, IssueStatus.CLOSED].includes(newStatus),
+    });
+  }
 
   async transitionStatus(
     issueId: string,
@@ -93,6 +109,8 @@ export class IssueLifecycleService {
       ...metadata,
     });
 
+    this.emitStatusEvent(issue, oldStatus, newStatus, userId);
+
     return issue;
   }
 
@@ -128,6 +146,17 @@ export class IssueLifecycleService {
         remainingTasks,
       });
     }
+
+    this.notificationsGateway.sendIssueUpdate(issueId, {
+      type: 'progress',
+      completionPercentage: issue.completionPercentage,
+      pendingWork,
+      completedWork,
+      remainingTasks,
+      estimatedCompletion,
+      title: issue.title,
+      status: issue.status,
+    });
 
     return issue;
   }
@@ -242,6 +271,14 @@ export class IssueLifecycleService {
     await this.addTimelineEvent(issueId, TimelineAction.ESCALATED, userId, userName, userRole, {
       reason,
       escalationLevel: currentLevel + 1,
+    });
+
+    this.notificationsGateway.sendIssueUpdate(issueId, {
+      type: 'escalated',
+      escalationLevel: currentLevel + 1,
+      priority: issue.priority,
+      title: issue.title,
+      status: issue.status,
     });
 
     return issue;

@@ -14,6 +14,7 @@ import { IssueLifecycleService } from './issue-lifecycle.service';
 import { CreateIssueDto } from './dto/create-issue.dto';
 import { UpdateIssueDto } from './dto/update-issue.dto';
 import { QueryIssueDto } from './dto/query-issue.dto';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 @Injectable()
 export class IssuesService {
@@ -27,7 +28,12 @@ export class IssuesService {
     @InjectRepository(Comment)
     private readonly commentRepository: Repository<Comment>,
     private readonly lifecycleService: IssueLifecycleService,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
+
+  private emitIssueEvent(type: string, issueId: string, extra: Record<string, any> = {}) {
+    this.notificationsGateway.sendIssueUpdate(issueId, { type, ...extra });
+  }
 
   async findAll(queryDto: QueryIssueDto) {
     const {
@@ -151,6 +157,16 @@ export class IssuesService {
       category: saved.category,
     });
 
+    this.emitIssueEvent('created', saved.id, {
+      latitude: createIssueDto.latitude,
+      longitude: createIssueDto.longitude,
+      title: saved.title,
+      category: saved.category,
+      priority: saved.priority,
+      status: saved.status,
+      createdAt: saved.createdAt,
+    });
+
     return this.findOne(saved.id);
   }
 
@@ -171,6 +187,14 @@ export class IssuesService {
 
     await this.addTimelineEvent(id, TimelineAction.STATUS_CHANGED, userId, updateIssueDto);
 
+    this.emitIssueEvent('updated', id, {
+      status: issue.status,
+      priority: issue.priority,
+      latitude: updateIssueDto.latitude,
+      longitude: updateIssueDto.longitude,
+      title: issue.title,
+    });
+
     return this.findOne(id);
   }
 
@@ -182,6 +206,7 @@ export class IssuesService {
     }
 
     await this.issueRepository.remove(issue);
+    this.emitIssueEvent('removed', id, {});
     return { message: 'Issue deleted successfully' };
   }
 
@@ -199,6 +224,8 @@ export class IssuesService {
 
     await this.addTimelineEvent(id, TimelineAction.UPVOTED, userId);
 
+    this.emitIssueEvent('upvoted', id, { upvotes: (issue.upvotes || 0) + 1, communityScore });
+
     return this.findOne(id);
   }
 
@@ -215,6 +242,8 @@ export class IssuesService {
     await this.issueRepository.update(id, { communityScore });
 
     await this.addTimelineEvent(id, TimelineAction.DOWNVOTED, userId);
+
+    this.emitIssueEvent('downvoted', id, { downvotes: (issue.downvotes || 0) + 1, communityScore });
 
     return this.findOne(id);
   }
@@ -241,6 +270,12 @@ export class IssuesService {
     await this.issueRepository.save(issue);
 
     await this.addTimelineEvent(id, TimelineAction.ASSIGNED, userId, {
+      departmentId,
+      assignedToId,
+    });
+
+    this.emitIssueEvent('assigned', id, {
+      status: issue.status,
       departmentId,
       assignedToId,
     });

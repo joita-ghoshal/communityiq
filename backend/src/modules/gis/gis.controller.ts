@@ -57,4 +57,65 @@ export class GisController {
   async geofence(@Query('lat') lat: number, @Query('lng') lng: number) {
     return this.gisService.checkGeofence(lat, lng);
   }
+
+  @Get('reverse-geocode')
+  @ApiOperation({ summary: 'Reverse geocode coordinates to address (OpenStreetMap)' })
+  @ApiQuery({ name: 'lat', type: Number })
+  @ApiQuery({ name: 'lng', type: Number })
+  async reverseGeocode(@Query('lat') lat: number, @Query('lng') lng: number) {
+    return this.gisService.reverseGeocode(lat, lng);
+  }
+
+  @Get('geocode')
+  @ApiOperation({ summary: 'Forward geocode a free-text address/landmark query (OpenStreetMap)' })
+  @ApiQuery({ name: 'q', type: String })
+  async geocode(@Query('q') q: string) {
+    return this.gisService.forwardGeocode(q);
+  }
+
+  @Get('search')
+  @ApiOperation({ summary: 'Smart search: addresses, landmarks, wards, PIN codes, departments, issues' })
+  @ApiQuery({ name: 'q', type: String })
+  @ApiQuery({ name: 'type', enum: ['address', 'landmark', 'ward', 'pincode', 'department'], required: false })
+  async search(@Query('q') q: string, @Query('type') type?: string) {
+    return this.gisService.searchAll(q, type);
+  }
+
+  @Get('explore')
+  @ApiOperation({ summary: 'Issues around a point with filters, distance, reporter & AI verification' })
+  @ApiQuery({ name: 'lat', type: Number })
+  @ApiQuery({ name: 'lng', type: Number })
+  @ApiQuery({ name: 'radius', type: Number, required: false })
+  @ApiQuery({ name: 'category', type: String, required: false })
+  @ApiQuery({ name: 'priority', type: String, required: false })
+  @ApiQuery({ name: 'status', type: String, required: false })
+  @ApiQuery({ name: 'departmentId', type: String, required: false })
+  @ApiQuery({ name: 'aiVerified', type: String, required: false })
+  async explore(
+    @Query('lat') lat: number,
+    @Query('lng') lng: number,
+    @Query('radius') radius = 20,
+    @Query('category') category?: string,
+    @Query('priority') priority?: string,
+    @Query('status') status?: string,
+    @Query('departmentId') departmentId?: string,
+    @Query('aiVerified') aiVerified?: string,
+  ) {
+    return this.gisService.explore(lat, lng, radius, { category, priority, status, departmentId, aiVerified });
+  }
+
+  @Get('ai-overlay')
+  @ApiOperation({ summary: 'AI overlays: risk zones, predicted hotspots, community health, duplicates' })
+  @ApiQuery({ name: 'city', type: String, required: false })
+  async aiOverlay(@Query('city') city?: string) {
+    return this.gisService.aiOverlays(city);
+  }
+
+  @Get('nearby-similar')
+  @ApiOperation({ summary: 'Find similar issues near an issue (duplicate detection)' })
+  @ApiQuery({ name: 'issueId', type: String })
+  @ApiQuery({ name: 'radiusKm', type: Number, required: false })
+  async nearbySimilar(@Query('issueId') issueId: string, @Query('radiusKm') radiusKm?: number) {
+    return this.gisService.nearbySimilar(issueId, radiusKm);
+  }
 }

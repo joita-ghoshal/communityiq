@@ -12,9 +12,54 @@ import { DataSource } from 'typeorm';
 import { User, UserRole } from './database/entities/user.entity';
 import * as bcrypt from 'bcrypt';
 
+// Assign GPS coordinates to issues that have no PostGIS location yet
+// (deterministic per-id jitter around the city centre so markers show on the map)
+async function backfillIssueLocations(dataSource: DataSource) {
+  try {
+    const { Issue } = require('./database/entities/issue.entity');
+    const issueRepo = dataSource.getRepository(Issue);
+    const missing = await issueRepo
+      .createQueryBuilder('issue')
+      .where('issue.location IS NULL')
+      .getMany();
+
+    if (missing.length === 0) {
+      console.log('Location backfill: no issues missing coordinates.');
+      return;
+    }
+    console.log(`Location backfill: assigning coordinates to ${missing.length} issues...`);
+
+    const cities: Record<string, [number, number]> = {
+      KOLKATA: [22.5726, 88.3639],
+      MUMBAI: [19.076, 72.8777],
+      DELHI: [28.6139, 77.209],
+      BENGALURU: [12.9716, 77.5946],
+      CHENNAI: [13.0827, 80.2707],
+      HYDERABAD: [17.385, 78.4867],
+      PUNE: [18.5204, 73.8567],
+    };
+
+    for (const issue of missing) {
+      const cityKey = (issue.city || 'Kolkata').toUpperCase();
+      const [baseLat, baseLng] = cities[cityKey] || cities.KOLKATA;
+      const seed = issue.id
+        ? Array.from(String(issue.id)).reduce((acc, c) => acc + c.charCodeAt(0), 0)
+        : Math.floor(Math.random() * 100000);
+      const lat = baseLat + ((seed % 100) - 50) / 1000;
+      const lng = baseLng + (((seed * 7) % 100) - 50) / 1000;
+      await issueRepo.query(
+        `UPDATE issues SET location = ST_SetSRID(ST_MakePoint($1, $2), 4326) WHERE id = $3`,
+        [lng, lat, issue.id],
+      );
+    }
+    console.log(`Location backfill: done (${missing.length} issues updated).`);
+  } catch (e: any) {
+    console.warn(`Location backfill skipped: ${e.message}`);
+  }
+}
+
 async function seedUsers(dataSource: DataSource) {
   const userRepo = dataSource.getRepository(User);
-
   // Explicitly verify DB connection
   if (!dataSource.isInitialized) {
     console.log('Waiting for database connection...');
@@ -160,6 +205,7 @@ async function bootstrap() {
 
   const dataSource = app.get(DataSource);
   await seedUsers(dataSource);
+  await backfillIssueLocations(dataSource);
 
   const port = configService.get<number>('PORT', 3001);
   await app.listen(port);

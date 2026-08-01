@@ -2,12 +2,14 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EmergencyAlert, AlertType, AlertSeverity } from '../../database/entities/emergency-alert.entity';
+import { NotificationsGateway } from '../notifications/notifications.gateway';
 
 @Injectable()
 export class EmergencyService {
   constructor(
     @InjectRepository(EmergencyAlert)
     private readonly alertRepo: Repository<EmergencyAlert>,
+    private readonly notificationsGateway: NotificationsGateway,
   ) {}
 
   private haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -50,6 +52,18 @@ export class EmergencyService {
       );
     }
 
+    this.notificationsGateway.sendEmergencyAlert({
+      id: saved.id,
+      type: saved.type,
+      severity: saved.severity,
+      title: saved.title,
+      description: saved.description,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      isActive: true,
+      createdAt: saved.createdAt,
+    });
+
     return saved;
   }
 
@@ -60,6 +74,14 @@ export class EmergencyService {
     alert.isActive = false;
     alert.resolvedAt = new Date();
     await this.alertRepo.save(alert);
+
+    this.notificationsGateway.sendEmergencyAlert({
+      id: alert.id,
+      title: alert.title,
+      severity: alert.severity,
+      isActive: false,
+      resolvedAt: alert.resolvedAt,
+    });
 
     return { message: 'Alert resolved', id, resolvedAt: alert.resolvedAt };
   }
