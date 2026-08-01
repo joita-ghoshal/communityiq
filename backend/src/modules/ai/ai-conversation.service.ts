@@ -80,10 +80,10 @@ export class AiConversationService {
     if (ids.length) {
       const rows = await this.msgRepo
         .createQueryBuilder('m')
-        .select('m."conversationId"', 'conversationId')
+        .select('m."conversation_id"', 'conversationId')
         .addSelect('COUNT(*)', 'count')
-        .where('m."conversationId" IN (:...ids)', { ids })
-        .groupBy('m."conversationId"')
+        .where('m."conversation_id" IN (:...ids)', { ids })
+        .groupBy('m."conversation_id"')
         .getRawMany();
       for (const r of rows) counts[r.conversationId] = Number(r.count || 0);
     }

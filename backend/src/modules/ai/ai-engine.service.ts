@@ -148,6 +148,7 @@ export class AiEngineService {
     const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(60_000),
       body: JSON.stringify({
         contents: this.geminiContents(messages),
         generationConfig: {
@@ -171,6 +172,7 @@ export class AiEngineService {
     const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(90_000),
       body: JSON.stringify({
         contents: this.geminiContents(messages),
         generationConfig: {
@@ -224,6 +226,7 @@ export class AiEngineService {
         'Content-Type': 'application/json',
         ...(provider.id === 'openrouter' ? { 'HTTP-Referer': 'https://communityiq-green.vercel.app', 'X-Title': 'CommunityIQ' } : {}),
       },
+      signal: AbortSignal.timeout(60_000),
       body: JSON.stringify({
         model: provider.model,
         messages: this.openAiMessages(messages),
@@ -255,6 +258,7 @@ export class AiEngineService {
         'Content-Type': 'application/json',
         ...(provider.id === 'openrouter' ? { 'HTTP-Referer': 'https://communityiq-green.vercel.app', 'X-Title': 'CommunityIQ' } : {}),
       },
+      signal: AbortSignal.timeout(90_000),
       body: JSON.stringify({
         model: provider.model,
         messages: this.openAiMessages(messages),
