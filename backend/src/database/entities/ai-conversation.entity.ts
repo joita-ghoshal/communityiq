@@ -32,7 +32,7 @@ export class AiConversation {
   @Column({ type: 'jsonb', nullable: true })
   meta: any;
 
-  @OneToMany(() => AiMessage, (message) => message.conversation, { cascade: true })
+  @OneToMany(() => AiMessage, (message) => message.conversation)
   messages: AiMessage[];
 
   @CreateDateColumn({ name: 'created_at' })

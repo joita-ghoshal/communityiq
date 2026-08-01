@@ -12,6 +12,7 @@
   Param,
   Query,
   HttpException,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBody, ApiBearerAuth } from '@nestjs/swagger';
 import { Response } from 'express';
@@ -25,6 +26,8 @@ import { SkipTransform } from '../../common/decorators/skip-transform.decorator'
 @ApiTags('AI Intelligence')
 @Controller('ai')
 export class AiController {
+  private readonly logger = new Logger(AiController.name);
+
   constructor(
     private readonly aiService: AiService,
     private readonly conversationService: AiConversationService,
@@ -236,7 +239,7 @@ export class AiController {
     }
     try {
       const reply = await this.conversationService.regenerate(user, id, body.location);
-      return { ...reply, success: true, timestamp: new Date().toISOString() };
+      res.status(HttpStatus.OK).json({ ...reply, success: true, timestamp: new Date().toISOString() });
     } catch (e: any) {
       throw new HttpException(e.message || 'AI service error', e.status || HttpStatus.INTERNAL_SERVER_ERROR);
     }
@@ -273,6 +276,8 @@ export class AiController {
 
   private writeSseError(res: Response, e: any) {
     const message = e?.message || 'AI service error';
+    this.logger.error(`SSE stream error: ${message}`);
+    if (e?.stack) this.logger.error(e.stack);
     res.write(`data: ${JSON.stringify({ type: 'error', message })}\n\n`);
     res.end();
   }

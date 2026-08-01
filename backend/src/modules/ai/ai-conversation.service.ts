@@ -165,7 +165,7 @@ export class AiConversationService {
       result = await this.engine.generate(messages);
     } catch (e) {
       conv.meta = { ...(conv.meta || {}), lastError: true };
-      await this.convRepo.save(conv);
+      await this.convRepo.update(conv.id, { meta: conv.meta });
       throw e;
     }
 
@@ -180,7 +180,7 @@ export class AiConversationService {
     await this.msgRepo.save(reply);
     conv.title = history.length === 1 ? this.cleanTitle(request.message) : conv.title;
     conv.meta = { ...(conv.meta || {}), lastError: false };
-    await this.convRepo.save(conv);
+    await this.convRepo.update(conv.id, { title: conv.title, meta: conv.meta });
 
     return { conversationId: conv.id, messageId: reply.id, content: result.content, provider: result.provider, model: result.model };
   }
@@ -219,7 +219,7 @@ export class AiConversationService {
       }
     } catch (e) {
       conv.meta = { ...(conv.meta || {}), lastError: true };
-      await this.convRepo.save(conv);
+      await this.convRepo.update(conv.id, { meta: conv.meta });
       throw e;
     }
 
@@ -233,7 +233,7 @@ export class AiConversationService {
     await this.msgRepo.save(reply);
     conv.title = history.length === 1 ? this.cleanTitle(request.message) : conv.title;
     conv.meta = { ...(conv.meta || {}), lastError: false };
-    await this.convRepo.save(conv);
+    await this.convRepo.update(conv.id, { title: conv.title, meta: conv.meta });
 
     yield { type: 'done', conversationId: conv.id, messageId: reply.id };
   }
@@ -255,7 +255,7 @@ export class AiConversationService {
       result = await this.engine.generate(messages);
     } catch (e) {
       conv.meta = { ...(conv.meta || {}), lastError: true };
-      await this.convRepo.save(conv);
+      await this.convRepo.update(conv.id, { meta: conv.meta });
       throw e;
     }
     const reply = this.msgRepo.create({
@@ -267,7 +267,7 @@ export class AiConversationService {
     });
     await this.msgRepo.save(reply);
     conv.meta = { ...(conv.meta || {}), lastError: false };
-    await this.convRepo.save(conv);
+    await this.convRepo.update(conv.id, { meta: conv.meta });
     return { conversationId: conv.id, messageId: reply.id, content: result.content, provider: result.provider, model: result.model };
   }
 
@@ -301,7 +301,7 @@ export class AiConversationService {
       }
     } catch (e) {
       conv.meta = { ...(conv.meta || {}), lastError: true };
-      await this.convRepo.save(conv);
+      await this.convRepo.update(conv.id, { meta: conv.meta });
       throw e;
     }
     const reply = this.msgRepo.create({
@@ -313,7 +313,7 @@ export class AiConversationService {
     });
     await this.msgRepo.save(reply);
     conv.meta = { ...(conv.meta || {}), lastError: false };
-    await this.convRepo.save(conv);
+    await this.convRepo.update(conv.id, { meta: conv.meta });
     yield { type: 'done', conversationId: conv.id, messageId: reply.id };
   }
 }
