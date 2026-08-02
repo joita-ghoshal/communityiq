@@ -104,4 +104,21 @@ export class EmergencyController {
   ) {
     return this.emergencyService.checkProximityAlerts(latitude, longitude, Number(radius));
   }
+
+  @Get('ai-proximity-check')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth('access-token')
+  @ApiOperation({
+    summary: 'AI-verified proximity emergency check — automatically detects AI-confirmed Critical Alerts / Critical Zones within 500m',
+  })
+  @ApiQuery({ name: 'latitude', type: Number })
+  @ApiQuery({ name: 'longitude', type: Number })
+  @ApiQuery({ name: 'radius', type: Number, required: false, description: 'Search radius in km (default: 2). The critical auto-trigger is always limited to 500m.' })
+  async aiProximityCheck(
+    @Query('latitude') latitude: number,
+    @Query('longitude') longitude: number,
+    @Query('radius') radius = 2,
+  ) {
+    return this.emergencyService.checkAiProximityAlerts(latitude, longitude, Number(radius));
+  }
 }
