@@ -21,20 +21,47 @@ interface EmergencyAlert {
   aiConfidence?: number;
 }
 
-let unlockResume: (() => void) | null = null;
+let sharedCtx: AudioContext | null = null;
+let audioUnlockBound = false;
 
-function removeUnlockListeners() {
-  if (unlockResume) {
-    document.removeEventListener('pointerdown', unlockResume);
-    document.removeEventListener('keydown', unlockResume);
-    unlockResume = null;
+function getSharedContext(): AudioContext | null {
+  if (!sharedCtx) {
+    try {
+      sharedCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    } catch {
+      sharedCtx = null;
+    }
   }
+  return sharedCtx;
+}
+
+function resumeSharedContext() {
+  try {
+    if (sharedCtx && sharedCtx.state === 'suspended') {
+      sharedCtx.resume().catch(() => {});
+    }
+  } catch { /* silent */ }
+}
+
+function bindAudioUnlock() {
+  if (audioUnlockBound) return;
+  audioUnlockBound = true;
+  const unlock = () => {
+    getSharedContext();
+    resumeSharedContext();
+  };
+  document.addEventListener('pointerdown', unlock);
+  document.addEventListener('touchstart', unlock);
+  document.addEventListener('keydown', unlock);
 }
 
 function playAlertTone() {
   stopAlertTone();
   try {
-    const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const ctx = getSharedContext();
+    if (!ctx) return;
+    bindAudioUnlock();
+    resumeSharedContext();
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.0001, ctx.currentTime);
     master.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.03);
@@ -44,7 +71,7 @@ function playAlertTone() {
     const oscs: OscillatorNode[] = [];
 
     const playPattern = () => {
-      if (stopped || ctx.state === 'closed') return;
+      if (stopped) return;
       const t0 = ctx.currentTime + 0.05;
       const notes = [
         { freq: 659.25, start: 0, dur: 0.3 },
@@ -70,28 +97,15 @@ function playAlertTone() {
     };
     playPattern();
 
-    const stop = () => {
-      if (stopped) return;
-      stopped = true;
-      timers.forEach((t) => clearTimeout(t));
-      oscs.forEach((o) => { try { o.stop(); } catch { /* silent */ } });
-      removeUnlockListeners();
-      try { ctx.close(); } catch { /* silent */ }
+    toneRef.current = {
+      stop: () => {
+        if (stopped) return;
+        stopped = true;
+        timers.forEach((t) => clearTimeout(t));
+        oscs.forEach((o) => { try { o.stop(); } catch { /* silent */ } });
+        try { master.disconnect(); } catch { /* silent */ }
+      },
     };
-    toneRef.current = { ctx, stop };
-
-    const resume = () => {
-      try {
-        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
-        if (ctx.state === 'running') removeUnlockListeners();
-      } catch { /* silent */ }
-    };
-    unlockResume = resume;
-    resume();
-    if (ctx.state === 'suspended') {
-      document.addEventListener('pointerdown', resume);
-      document.addEventListener('keydown', resume);
-    }
   } catch { /* silent */ }
 }
 
@@ -102,7 +116,7 @@ function stopAlertTone() {
   }
 }
 
-const toneRef = { current: null as null | { ctx: AudioContext; stop: () => void } };
+const toneRef = { current: null as null | { stop: () => void } };
 
 export default function GeofenceAlert() {
   const [alerts, setAlerts] = useState<EmergencyAlert[]>([]);
