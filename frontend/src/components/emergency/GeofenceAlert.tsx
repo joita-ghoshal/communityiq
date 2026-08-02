@@ -43,6 +43,12 @@ function resumeSharedContext() {
   } catch { /* silent */ }
 }
 
+function resumeWhenVisible() {
+  try {
+    if (document.visibilityState === 'visible') resumeSharedContext();
+  } catch { /* silent */ }
+}
+
 function bindAudioUnlock() {
   if (audioUnlockBound) return;
   audioUnlockBound = true;
@@ -55,6 +61,14 @@ function bindAudioUnlock() {
   document.addEventListener('keydown', unlock);
 }
 
+function prepareAudio() {
+  try {
+    bindAudioUnlock();
+    getSharedContext();
+    resumeSharedContext();
+  } catch { /* silent */ }
+}
+
 function playAlertTone() {
   stopAlertTone();
   try {
@@ -64,7 +78,7 @@ function playAlertTone() {
     resumeSharedContext();
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.0001, ctx.currentTime);
-    master.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.03);
+    master.gain.exponentialRampToValueAtTime(0.2, ctx.currentTime + 0.03);
     master.connect(ctx.destination);
     let stopped = false;
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -97,16 +111,30 @@ function playAlertTone() {
     };
     playPattern();
 
+    const resumeTimer = setInterval(resumeSharedContext, 1000);
+    window.addEventListener('focus', resumeWhenVisible);
+    document.addEventListener('visibilitychange', resumeWhenVisible);
+
     toneRef.current = {
       stop: () => {
         if (stopped) return;
         stopped = true;
+        clearInterval(resumeTimer);
+        window.removeEventListener('focus', resumeWhenVisible);
+        document.removeEventListener('visibilitychange', resumeWhenVisible);
         timers.forEach((t) => clearTimeout(t));
         oscs.forEach((o) => { try { o.stop(); } catch { /* silent */ } });
         try { master.disconnect(); } catch { /* silent */ }
       },
     };
-  } catch { /* silent */ }
+    if (ctx.state === 'running') {
+      console.info('[emergency] alert tone started (audio running)');
+    } else {
+      console.info('[emergency] alert tone scheduled; audio blocked by browser until first interaction');
+    }
+  } catch (e) {
+    console.warn('[emergency] alert tone failed', e);
+  }
 }
 
 function stopAlertTone() {
@@ -172,6 +200,7 @@ export default function GeofenceAlert() {
   }, [dismissedIds, showFullScreen]);
 
   useEffect(() => {
+    prepareAudio();
     if (!('geolocation' in navigator)) return;
 
     watchIdRef.current = navigator.geolocation.watchPosition(
