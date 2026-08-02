@@ -21,47 +21,77 @@ interface EmergencyAlert {
   aiConfidence?: number;
 }
 
+let unlockResume: (() => void) | null = null;
+
+function removeUnlockListeners() {
+  if (unlockResume) {
+    document.removeEventListener('pointerdown', unlockResume);
+    document.removeEventListener('keydown', unlockResume);
+    unlockResume = null;
+  }
+}
+
 function playAlertTone() {
+  stopAlertTone();
   try {
-    stopAlertTone();
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
     const master = ctx.createGain();
     master.gain.setValueAtTime(0.0001, ctx.currentTime);
     master.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.03);
     master.connect(ctx.destination);
+    let stopped = false;
+    const timers: ReturnType<typeof setTimeout>[] = [];
     const oscs: OscillatorNode[] = [];
-    const notes = [
-      { freq: 659.25, start: 0, dur: 0.3 },
-      { freq: 880.0, start: 0.38, dur: 0.55 },
-    ];
-    notes.forEach((n) => {
-      const osc = ctx.createOscillator();
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(n.freq, ctx.currentTime + n.start);
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.0001, ctx.currentTime + n.start);
-      gain.gain.exponentialRampToValueAtTime(0.9, ctx.currentTime + n.start + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + n.start + n.dur);
-      osc.connect(gain);
-      gain.connect(master);
-      osc.start(ctx.currentTime + n.start);
-      osc.stop(ctx.currentTime + n.start + n.dur + 0.05);
-      oscs.push(osc);
-    });
-    toneRef.current = {
-      stop: () => {
+
+    const playPattern = () => {
+      if (stopped || ctx.state === 'closed') return;
+      const t0 = ctx.currentTime + 0.05;
+      const notes = [
+        { freq: 659.25, start: 0, dur: 0.3 },
+        { freq: 880.0, start: 0.38, dur: 0.55 },
+      ];
+      notes.forEach((n) => {
         try {
-          oscs.forEach((o) => { try { o.stop(); } catch { /* silent */ } });
-          ctx.close();
+          const osc = ctx.createOscillator();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(n.freq, t0 + n.start);
+          const gain = ctx.createGain();
+          gain.gain.setValueAtTime(0.0001, t0 + n.start);
+          gain.gain.exponentialRampToValueAtTime(0.9, t0 + n.start + 0.03);
+          gain.gain.exponentialRampToValueAtTime(0.0001, t0 + n.start + n.dur);
+          osc.connect(gain);
+          gain.connect(master);
+          osc.start(t0 + n.start);
+          osc.stop(t0 + n.start + n.dur + 0.05);
+          oscs.push(osc);
         } catch { /* silent */ }
-      },
+      });
+      timers.push(setTimeout(playPattern, 1100));
     };
-    setTimeout(() => {
-      if (toneRef.current) {
-        toneRef.current = null;
-        try { ctx.close(); } catch { /* silent */ }
-      }
-    }, 2600);
+    playPattern();
+
+    const stop = () => {
+      if (stopped) return;
+      stopped = true;
+      timers.forEach((t) => clearTimeout(t));
+      oscs.forEach((o) => { try { o.stop(); } catch { /* silent */ } });
+      removeUnlockListeners();
+      try { ctx.close(); } catch { /* silent */ }
+    };
+    toneRef.current = { ctx, stop };
+
+    const resume = () => {
+      try {
+        if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+        if (ctx.state === 'running') removeUnlockListeners();
+      } catch { /* silent */ }
+    };
+    unlockResume = resume;
+    resume();
+    if (ctx.state === 'suspended') {
+      document.addEventListener('pointerdown', resume);
+      document.addEventListener('keydown', resume);
+    }
   } catch { /* silent */ }
 }
 
@@ -72,14 +102,13 @@ function stopAlertTone() {
   }
 }
 
-const toneRef = { current: null as null | { stop: () => void } };
+const toneRef = { current: null as null | { ctx: AudioContext; stop: () => void } };
 
 export default function GeofenceAlert() {
   const [alerts, setAlerts] = useState<EmergencyAlert[]>([]);
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(new Set());
   const [showFullScreen, setShowFullScreen] = useState(false);
   const [countdown, setCountdown] = useState(30);
-  const [sirenEnabled, setSirenEnabled] = useState(true);
   const watchIdRef = useRef<number | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastPosRef = useRef<{ lat: number; lng: number }>({ lat: 0, lng: 0 });
@@ -124,10 +153,9 @@ export default function GeofenceAlert() {
       ) {
         setShowFullScreen(true);
         setCountdown(30);
-        if (sirenEnabled) playAlertTone();
       }
     } catch { /* silent */ }
-  }, [dismissedIds, showFullScreen, sirenEnabled]);
+  }, [dismissedIds, showFullScreen]);
 
   useEffect(() => {
     if (!('geolocation' in navigator)) return;
@@ -163,6 +191,17 @@ export default function GeofenceAlert() {
     }, 1000);
     return () => clearInterval(timer);
   }, [showFullScreen]);
+
+  const wasAlertShownRef = useRef(false);
+  useEffect(() => {
+    const shown = showFullScreen && alerts.length > 0;
+    if (shown && !wasAlertShownRef.current) {
+      playAlertTone();
+    } else if (!shown) {
+      stopAlertTone();
+    }
+    wasAlertShownRef.current = shown;
+  }, [showFullScreen, alerts]);
 
   const dismissAlert = (id: string) => {
     stopAlertTone();
