@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTranslation } from "react-i18next";
@@ -22,6 +22,7 @@ import {
   UserCog,
   Sparkles,
   Building2,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -37,14 +38,61 @@ const navItems = [
   { href: "/ai-assistant", icon: Sparkles, labelKey: "nav.aiAssistant", roles: ["citizen", "volunteer", "department_admin", "municipal_admin", "super_admin"] },
 ];
 
-export default function Sidebar() {
+interface SidebarProps {
+  mobileOpen?: boolean;
+  onClose?: () => void;
+}
+
+export default function Sidebar({ mobileOpen = false, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
   const { t } = useTranslation();
   const [collapsed, setCollapsed] = useState(false);
 
+  useEffect(() => {
+    if (mobileOpen && onClose) onClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
   const filteredNavItems = navItems.filter(
     (item) => user && item.roles.includes(user.role)
+  );
+
+  const navLinks = (extraClass = "") => (
+    <>
+      {filteredNavItems.map((item) => {
+        const isActive = pathname === item.href || (item.href !== "/" && pathname.startsWith(item.href));
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn("group relative", extraClass)}
+          >
+            <div
+              className={cn(
+                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                isActive
+                  ? "sidebar-link-active"
+                  : "sidebar-link"
+              )}
+            >
+              <item.icon
+                className={cn(
+                  "w-5 h-5 flex-shrink-0 transition-colors",
+                  isActive
+                    ? "text-blue-600 dark:text-blue-400"
+                    : "text-slate-400 group-hover:text-blue-500 dark:group-hover:text-blue-400"
+                )}
+              />
+              <span className="truncate">{t(item.labelKey)}</span>
+            </div>
+            {isActive && (
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 bg-blue-500 rounded-r-full" />
+            )}
+          </Link>
+        );
+      })}
+    </>
   );
 
   return (
@@ -182,6 +230,94 @@ export default function Sidebar() {
           >
             <LogOut className="w-5 h-5 flex-shrink-0" />
             {!collapsed && <span>Logout</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* Mobile Drawer (opened by the hamburger menu) */}
+      <div
+        aria-hidden={!mobileOpen}
+        onClick={onClose}
+        className={cn(
+          "lg:hidden fixed inset-0 z-[60] bg-slate-950/50 backdrop-blur-sm transition-opacity duration-300",
+          mobileOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        )}
+      />
+      <aside
+        className={cn(
+          "lg:hidden fixed top-0 left-0 bottom-0 w-[280px] max-w-[85vw] z-[70] flex flex-col transition-transform duration-300 ease-out border-r glass-sidebar",
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <div className="flex items-center justify-between px-5 py-5 border-b border-white/20 dark:border-slate-700/30">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-blue-500/20 flex-shrink-0">
+              <Shield className="w-5 h-5 text-white" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-base font-bold text-slate-800 dark:text-white truncate">
+                CommunityIQ
+              </span>
+              <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium uppercase tracking-wider">
+                Enterprise Platform
+              </span>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Close menu"
+            className="p-1.5 rounded-lg hover:bg-white/30 dark:hover:bg-slate-700/40 transition-colors text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-thin">
+          {navLinks()}
+        </nav>
+
+        {user?.role === "super_admin" && (
+          <div className="px-3 pb-2">
+            <Link
+              href="/admin"
+              className={cn(
+                "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200",
+                pathname === "/admin"
+                  ? "bg-gradient-to-r from-indigo-500/15 to-purple-500/15 text-indigo-700 dark:text-indigo-300 border-l-3 border-indigo-500"
+                  : "text-slate-500 dark:text-slate-400 hover:bg-white/30 dark:hover:bg-slate-700/40 hover:text-indigo-600 dark:hover:text-indigo-400"
+              )}
+            >
+              <UserCog className="w-5 h-5 flex-shrink-0" />
+              <span>Admin Panel</span>
+            </Link>
+          </div>
+        )}
+
+        <div className="px-3 py-4 border-t border-white/20 dark:border-slate-700/30 space-y-2">
+          {user && (
+            <Link
+              href="/profile"
+              className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 hover:bg-white/30 dark:hover:bg-slate-700/40"
+            >
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-md shadow-blue-500/20">
+                {user.firstName?.charAt(0)?.toUpperCase() || "U"}
+              </div>
+              <div className="flex flex-col min-w-0 flex-1">
+                <span className="text-sm font-semibold text-slate-800 dark:text-white truncate">
+                  {user.firstName ? `${user.firstName} ${user.lastName}` : "User"}
+                </span>
+                <span className="text-[10px] text-slate-500 dark:text-slate-400 capitalize truncate">
+                  {user.role?.replace("_", " ")}
+                </span>
+              </div>
+            </Link>
+          )}
+          <button
+            onClick={logout}
+            className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-slate-500 dark:text-slate-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-all duration-200 w-full"
+          >
+            <LogOut className="w-5 h-5 flex-shrink-0" />
+            <span>Logout</span>
           </button>
         </div>
       </aside>
