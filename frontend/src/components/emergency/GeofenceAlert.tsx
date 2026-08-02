@@ -17,34 +17,62 @@ interface EmergencyAlert {
   radius?: number;
   safetyInstructions?: string;
   createdAt: string;
+  aiCritical?: boolean;
+  aiConfidence?: number;
 }
 
-function playSiren() {
+function playAlertTone() {
   try {
+    stopAlertTone();
     const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const osc1 = ctx.createOscillator();
-    const osc2 = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc1.type = 'sawtooth';
-    osc2.type = 'square';
-    osc1.frequency.setValueAtTime(600, ctx.currentTime);
-    osc1.frequency.linearRampToValueAtTime(1200, ctx.currentTime + 0.5);
-    osc1.frequency.linearRampToValueAtTime(600, ctx.currentTime + 1);
-    osc2.frequency.setValueAtTime(500, ctx.currentTime);
-    osc2.frequency.linearRampToValueAtTime(1000, ctx.currentTime + 0.5);
-    osc2.frequency.linearRampToValueAtTime(500, ctx.currentTime + 1);
-    gain.gain.setValueAtTime(0.15, ctx.currentTime);
-    gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 1);
-    osc1.connect(gain);
-    osc2.connect(gain);
-    gain.connect(ctx.destination);
-    osc1.start(ctx.currentTime);
-    osc2.start(ctx.currentTime);
-    osc1.stop(ctx.currentTime + 1);
-    osc2.stop(ctx.currentTime + 1);
-    setTimeout(() => ctx.close(), 1500);
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.0001, ctx.currentTime);
+    master.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.03);
+    master.connect(ctx.destination);
+    const oscs: OscillatorNode[] = [];
+    const notes = [
+      { freq: 659.25, start: 0, dur: 0.3 },
+      { freq: 880.0, start: 0.38, dur: 0.55 },
+    ];
+    notes.forEach((n) => {
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(n.freq, ctx.currentTime + n.start);
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime + n.start);
+      gain.gain.exponentialRampToValueAtTime(0.9, ctx.currentTime + n.start + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + n.start + n.dur);
+      osc.connect(gain);
+      gain.connect(master);
+      osc.start(ctx.currentTime + n.start);
+      osc.stop(ctx.currentTime + n.start + n.dur + 0.05);
+      oscs.push(osc);
+    });
+    toneRef.current = {
+      stop: () => {
+        try {
+          oscs.forEach((o) => { try { o.stop(); } catch { /* silent */ } });
+          ctx.close();
+        } catch { /* silent */ }
+      },
+    };
+    setTimeout(() => {
+      if (toneRef.current) {
+        toneRef.current = null;
+        try { ctx.close(); } catch { /* silent */ }
+      }
+    }, 2600);
   } catch { /* silent */ }
 }
+
+function stopAlertTone() {
+  if (toneRef.current) {
+    try { toneRef.current.stop(); } catch { /* silent */ }
+    toneRef.current = null;
+  }
+}
+
+const toneRef = { current: null as null | { stop: () => void } };
 
 export default function GeofenceAlert() {
   const [alerts, setAlerts] = useState<EmergencyAlert[]>([]);
@@ -59,9 +87,10 @@ export default function GeofenceAlert() {
   const checkProximity = useCallback(async (lat: number, lng: number) => {
     try {
       const { data } = await api.get(
-        `/emergency/proximity-check?latitude=${lat}&longitude=${lng}&radius=2`
+        `/emergency/ai-proximity-check?latitude=${lat}&longitude=${lng}&radius=2`
       );
-      const items = data?.data || data?.alerts || data || [];
+      const body = data?.data || data || {};
+      const items = body.alerts || [];
       const activeAlerts: EmergencyAlert[] = Array.isArray(items)
         ? items
             .filter((a: any) => !dismissedIds.has(a.id || a._id))
@@ -80,17 +109,22 @@ export default function GeofenceAlert() {
               radius: a.radius || 500,
               safetyInstructions: a.safetyInstructions || a.description || '',
               createdAt: a.createdAt || new Date().toISOString(),
+              aiCritical: a.aiCritical === true,
+              aiConfidence: typeof a.aiConfidence === 'number' ? a.aiConfidence : 0,
             }))
         : [];
       setAlerts(activeAlerts);
 
-      const criticalNearby = activeAlerts.find(
-        (a) => ['extreme', 'severe'].includes(a.severity) && a.distance < 1
-      );
-      if (criticalNearby && !showFullScreen) {
+      const critical = body.criticalAlert || null;
+      if (
+        critical &&
+        critical.aiCritical === true &&
+        !dismissedIds.has(critical.id || critical._id) &&
+        !showFullScreen
+      ) {
         setShowFullScreen(true);
         setCountdown(30);
-        if (sirenEnabled) playSiren();
+        if (sirenEnabled) playAlertTone();
       }
     } catch { /* silent */ }
   }, [dismissedIds, showFullScreen, sirenEnabled]);
@@ -115,6 +149,7 @@ export default function GeofenceAlert() {
     return () => {
       if (watchIdRef.current !== null) navigator.geolocation.clearWatch(watchIdRef.current);
       if (intervalRef.current !== null) clearInterval(intervalRef.current);
+      stopAlertTone();
     };
   }, [checkProximity]);
 
@@ -130,6 +165,7 @@ export default function GeofenceAlert() {
   }, [showFullScreen]);
 
   const dismissAlert = (id: string) => {
+    stopAlertTone();
     setDismissedIds((prev) => new Set(prev).add(id));
     const remaining = alerts.filter((a) => a.id !== id);
     setAlerts(remaining);
@@ -137,6 +173,7 @@ export default function GeofenceAlert() {
   };
 
   const dismissFullScreen = () => {
+    stopAlertTone();
     if (alerts.length > 0) dismissAlert(alerts[0].id);
     setShowFullScreen(false);
   };
