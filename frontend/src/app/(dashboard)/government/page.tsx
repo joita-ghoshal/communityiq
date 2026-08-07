@@ -133,7 +133,14 @@ export default function GovernmentPage() {
           api.get('/emergency/alerts/active'),
         ]);
         if (dashRes.status === 'fulfilled') { const d = dashRes.value.data?.data || dashRes.value.data; setDashboard(d); }
-        if (issuesRes.status === 'fulfilled') { const raw = issuesRes.value.data?.data?.data || issuesRes.value.data?.data || issuesRes.value.data; setIssues(Array.isArray(raw) ? raw : []); }
+        if (issuesRes.status === 'fulfilled') {
+          const raw = issuesRes.value.data?.data?.data || issuesRes.value.data?.data || issuesRes.value.data;
+          setIssues(Array.isArray(raw) ? raw.map((i: any) => ({
+            ...i,
+            department: typeof i.department === 'object' && i.department ? i.department.name || i.department.id : i.department ?? '',
+            assignedTo: typeof i.assignedTo === 'object' && i.assignedTo ? [i.assignedTo.firstName, i.assignedTo.lastName].filter(Boolean).join(' ') : i.assignedTo ?? '',
+          })) : []);
+        }
         if (deptRes.status === 'fulfilled') { const raw = deptRes.value.data?.data?.data || deptRes.value.data?.data || deptRes.value.data; setDepartments(Array.isArray(raw) ? raw : []); }
         if (kpiRes.status === 'fulfilled') { const raw = kpiRes.value.data?.data?.data || kpiRes.value.data?.data || kpiRes.value.data; setKpis(Array.isArray(raw) ? raw : []); }
         if (deptListRes.status === 'fulfilled') { const raw = deptListRes.value.data?.data?.data || deptListRes.value.data?.data || deptListRes.value.data; setAllDepartments(Array.isArray(raw) ? raw : []); }
@@ -160,24 +167,30 @@ export default function GovernmentPage() {
 
   useEffect(() => {
     if (activeTab === 'timeline') {
-      const events: TimelineEvent[] = [];
-      issues.slice(0, 50).forEach((issue, i) => {
-        events.push({
-          id: `evt-${i}`,
-          issueId: issue.id,
-          issueTitle: issue.title,
-          action: 'status_changed',
-          toStatus: issue.status,
-          performedBy: issue.assignedTo || 'System',
-          timestamp: issue.createdAt,
-          department: issue.department,
-          priority: issue.priority,
-        });
-      });
-      events.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-      setTimelineEvents(events);
+      api.get('/analytics/timeline?limit=100')
+        .then((res) => {
+          const raw = res.data?.data || res.data;
+          const list = Array.isArray(raw) ? raw.map((e: any) => ({
+            id: e.id ?? `evt-${e.issueId}-${e.timestamp}`,
+            issueId: e.issueId,
+            issueTitle: e.issueTitle || 'Issue',
+            action: e.action,
+            fromStatus: e.fromStatus,
+            toStatus: e.toStatus || e.status,
+            performedBy: e.performedBy || 'System',
+            timestamp: e.timestamp,
+            department: e.department || '',
+            priority: e.priority,
+          })) : [];
+          if (list.length > 0) {
+            setTimelineEvents(list);
+            return;
+          }
+          setTimelineEvents([]);
+        })
+        .catch(() => setTimelineEvents([]));
     }
-  }, [activeTab, issues]);
+  }, [activeTab]);
 
   const getSlaStatus = (issue: Issue) => {
     const created = new Date(issue.createdAt).getTime();
@@ -234,7 +247,16 @@ export default function GovernmentPage() {
     try {
       const res = await api.get(`/issues/${issueId}/timeline`);
       const raw = res.data?.data || res.data;
-      setRowTimeline(Array.isArray(raw) ? raw : []);
+      const list = Array.isArray(raw) ? raw.map((e: any) => ({
+        id: e.id ?? `evt-${e.issueId}-${e.createdAt}`,
+        issueId: e.issueId,
+        action: e.action,
+        fromStatus: e.metadata?.from || e.fromStatus || null,
+        toStatus: e.metadata?.to || e.metadata?.status || e.toStatus || null,
+        performedBy: e.performedByName || e.performedBy || 'System',
+        timestamp: e.createdAt || e.timestamp,
+      })) : [];
+      setRowTimeline(list);
     } catch {
       setRowTimeline([]);
     } finally {
@@ -261,10 +283,11 @@ export default function GovernmentPage() {
     }
   };
 
-  const handleAssign = async (issueId: string, dept: string) => {
+  const handleAssign = async (issueId: string, deptId: string) => {
     try {
-      await api.patch(`/issues/${issueId}/assign`, { departmentId: dept });
-      setIssues(prev => prev.map(i => i.id === issueId ? { ...i, department: dept } : i));
+      await api.patch(`/issues/${issueId}/assign`, { departmentId: deptId });
+      const deptName = allDepartments.find(d => d.id === deptId)?.name || deptId;
+      setIssues(prev => prev.map(i => i.id === issueId ? { ...i, department: deptName } : i));
     } catch (err) {
       console.error('Assign failed', err);
     }
@@ -279,7 +302,8 @@ export default function GovernmentPage() {
       }
     }
     if (bulkDept || bulkPriority) {
-      setIssues(prev => prev.map(i => selected.includes(i.id) ? { ...i, department: bulkDept || i.department, priority: bulkPriority || i.priority } : i));
+      const deptName = allDepartments.find(d => d.id === bulkDept)?.name || bulkDept;
+      setIssues(prev => prev.map(i => selected.includes(i.id) ? { ...i, department: deptName || i.department, priority: bulkPriority || i.priority } : i));
     }
     setSelectedIssues(new Set());
     setBulkDept('');
@@ -524,7 +548,7 @@ export default function GovernmentPage() {
                   <select value={bulkDept} onChange={e => setBulkDept(e.target.value)}
                     className="text-xs rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-slate-700 dark:text-slate-300">
                     <option value="">Assign Department</option>
-                    {allDepartments.map(d => <option key={d.id} value={d.name}>{d.name}</option>)}
+                    {allDepartments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
                   </select>
                   <select value={bulkPriority} onChange={e => setBulkPriority(e.target.value)}
                     className="text-xs rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-800 px-2 py-1.5 text-slate-700 dark:text-slate-300">
@@ -620,7 +644,7 @@ export default function GovernmentPage() {
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs font-medium text-slate-500">Assign to:</span>
                                     {allDepartments.map(d => (
-                                      <button key={d.id} onClick={() => expandedRow && handleAssign(expandedRow, d.name)}
+                                      <button key={d.id} onClick={() => expandedRow && handleAssign(expandedRow, d.id)}
                                         className="text-[10px] font-medium px-2 py-1 rounded-lg border border-slate-200 dark:border-slate-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 hover:border-blue-400 transition-all">
                                         {d.name}
                                       </button>

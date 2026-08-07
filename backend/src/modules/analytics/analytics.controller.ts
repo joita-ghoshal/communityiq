@@ -69,6 +69,15 @@ export class AnalyticsController {
     return this.analyticsService.getDepartmentBreakdown();
   }
 
+  @Get('timeline')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.MUNICIPAL_ADMIN, UserRole.SUPER_ADMIN, UserRole.DEPARTMENT_ADMIN)
+  @ApiOperation({ summary: 'Get issue lifecycle activity timeline' })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async getTimeline(@Query('limit') limit?: number) {
+    return this.analyticsService.getActivityTimeline(limit);
+  }
+
   @Get('geo')
   @ApiOperation({ summary: 'Get geographic distribution of issues' })
   async getGeo() {

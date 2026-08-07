@@ -5,6 +5,7 @@ import { Issue, IssueStatus, IssuePriority, IssueCategory } from '../../database
 import { User } from '../../database/entities/user.entity';
 import { Department } from '../../database/entities/department.entity';
 import { Volunteer } from '../../database/entities/volunteer.entity';
+import { IssueTimeline } from '../../database/entities/issue-timeline.entity';
 
 @Injectable()
 export class AnalyticsService {
@@ -13,7 +14,35 @@ export class AnalyticsService {
     @InjectRepository(User) private readonly userRepo: Repository<User>,
     @InjectRepository(Department) private readonly deptRepo: Repository<Department>,
     @InjectRepository(Volunteer) private readonly volRepo: Repository<Volunteer>,
+    @InjectRepository(IssueTimeline) private readonly timelineRepo: Repository<IssueTimeline>,
   ) {}
+
+  async getActivityTimeline(limit = 50) {
+    const events = await this.timelineRepo
+      .createQueryBuilder('tl')
+      .leftJoinAndSelect('tl.issue', 'issue')
+      .leftJoinAndSelect('issue.department', 'department')
+      .orderBy('tl.createdAt', 'DESC')
+      .take(Math.min(limit, 200))
+      .getMany();
+
+    return events.map((evt) => ({
+      id: evt.id,
+      issueId: evt.issueId,
+      issueTitle: evt.issue?.title || null,
+      action: evt.action,
+      description: evt.description,
+      performedBy: evt.performedByName || evt.performedBy || null,
+      performedByRole: evt.performedByRole || null,
+      fromStatus: evt.metadata?.from || evt.metadata?.fromStatus || null,
+      toStatus: evt.metadata?.to || evt.metadata?.toStatus || null,
+      timestamp: evt.createdAt,
+      department: evt.issue?.department?.name || evt.metadata?.departmentId || null,
+      priority: evt.issue?.priority || null,
+      category: evt.issue?.category || null,
+      status: evt.issue?.status || null,
+    }));
+  }
 
   async getDashboard(city?: string) {
     const qb = this.issueRepo.createQueryBuilder('issue');
