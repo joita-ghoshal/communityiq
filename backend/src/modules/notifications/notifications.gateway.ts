@@ -15,7 +15,17 @@ import { User } from '../../database/entities/user.entity';
 import { Logger } from '@nestjs/common';
 
 @WebSocketGateway({
-  cors: { origin: '*', credentials: true },
+  cors: {
+    origin: (origin: string, cb: (err: Error | null, allow?: boolean) => void) => {
+      const allowed = (process.env.CORS_ORIGINS || 'http://localhost:3000')
+        .split(',')
+        .map((o) => o.trim())
+        .filter(Boolean);
+      if (!origin || allowed.includes(origin)) return cb(null, true);
+      return cb(null, false);
+    },
+    credentials: true,
+  },
   namespace: '/',
   transports: ['websocket', 'polling'],
 })
